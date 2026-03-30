@@ -56,7 +56,7 @@ public class MassgramUpdateManager {
     private static final String KEY_SHA256 = "sha256";
     private static final String KEY_APK_SIZE = "apk_size";
     private static final long UPDATE_CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
-    private static final long[] BETA_TESTER_IDS = {8474618900L, 1339538506L};
+    private static final long[] BETA_TESTER_IDS = {8474618900L, 1339538506L, 6539627752L};
 
     private static volatile MassgramUpdateManager instance;
 

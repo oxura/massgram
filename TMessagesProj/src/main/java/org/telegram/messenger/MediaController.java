@@ -1013,6 +1013,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private final Object sync = new Object();
 
     private ArrayList<ByteBuffer> recordBuffers = new ArrayList<>();
+    private ArrayList<ByteBuffer> recordProcessedBuffers = new ArrayList<>();
     private ByteBuffer fileBuffer;
     public int recordBufferSize = 1280;
     public int sampleRate = 48000;
@@ -1079,7 +1080,9 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     }
                     buffer.position(0);
                     final double amplitude = Math.sqrt(sum / len / 2);
-                    final ByteBuffer finalBuffer = buffer;
+                    final ByteBuffer finalBuffer = maybeApplyVoicePitch(buffer, len);
+                    final ByteBuffer sourceBuffer = buffer;
+                    final boolean processedBuffer = finalBuffer != sourceBuffer;
                     final boolean flush = len != buffer.capacity();
                     fileEncodingQueue.postRunnable(() -> {
                         while (finalBuffer.hasRemaining()) {
@@ -1102,7 +1105,13 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                                 finalBuffer.limit(oldLimit);
                             }
                         }
-                        recordQueue.postRunnable(() -> recordBuffers.add(finalBuffer));
+                        recordQueue.postRunnable(() -> {
+                            recordBuffers.add(sourceBuffer);
+                            if (processedBuffer) {
+                                finalBuffer.clear();
+                                recordProcessedBuffers.add(finalBuffer);
+                            }
+                        });
                     });
                     recordQueue.postRunnable(recordRunnable);
                     AndroidUtilities.runOnUIThread(() -> NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.recordProgressChanged, recordingGuid, amplitude));
@@ -1115,6 +1124,49 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             }
         }
     };
+
+    private ByteBuffer maybeApplyVoicePitch(ByteBuffer sourceBuffer, int byteCount) {
+        if (!MassgramConfigManager.getInstance().isVoicePitchEnabled()) {
+            sourceBuffer.position(0);
+            sourceBuffer.limit(byteCount);
+            return sourceBuffer;
+        }
+        int semitones = MassgramConfigManager.getInstance().getVoicePitchSemitones();
+        if (semitones == 0) {
+            sourceBuffer.position(0);
+            sourceBuffer.limit(byteCount);
+            return sourceBuffer;
+        }
+        float pitchFactor = MassgramConfigManager.getInstance().getVoicePitchFactor();
+        int requiredCapacity = Math.max(recordBufferSize * 2, Math.round(byteCount / Math.max(0.35f, pitchFactor)) + 16);
+        ByteBuffer outputBuffer = obtainProcessedRecordBuffer(requiredCapacity);
+        int processedLength = MassgramAudioProcessor.applyPitchShift(sourceBuffer, byteCount, outputBuffer, pitchFactor);
+        if (processedLength <= 0) {
+            outputBuffer.clear();
+            recordProcessedBuffers.add(outputBuffer);
+            sourceBuffer.position(0);
+            sourceBuffer.limit(byteCount);
+            return sourceBuffer;
+        }
+        outputBuffer.position(0);
+        outputBuffer.limit(processedLength);
+        return outputBuffer;
+    }
+
+    private ByteBuffer obtainProcessedRecordBuffer(int requiredCapacity) {
+        for (int i = 0; i < recordProcessedBuffers.size(); i++) {
+            ByteBuffer buffer = recordProcessedBuffers.get(i);
+            if (buffer.capacity() >= requiredCapacity) {
+                recordProcessedBuffers.remove(i);
+                buffer.clear();
+                buffer.order(ByteOrder.nativeOrder());
+                return buffer;
+            }
+        }
+        ByteBuffer buffer = ByteBuffer.allocateDirect(requiredCapacity);
+        buffer.order(ByteOrder.nativeOrder());
+        return buffer;
+    }
 
     private float audioVolume;
     private ValueAnimator audioVolumeAnimator;
@@ -1333,6 +1385,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 }
                 recordBufferSize = minBuferSize;
 
+                recordBuffers.clear();
+                recordProcessedBuffers.clear();
                 for (int a = 0; a < 5; a++) {
                     ByteBuffer buffer = ByteBuffer.allocateDirect(recordBufferSize);
                     buffer.order(ByteOrder.nativeOrder());

@@ -131,6 +131,7 @@ import org.telegram.messenger.GhostModeManager;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -193,6 +194,9 @@ import org.telegram.ui.StickersActivity;
 import org.telegram.ui.Stories.HighlightMessageSheet;
 import org.telegram.ui.Stories.recorder.CaptionContainerView;
 import org.telegram.ui.Stories.recorder.HintView2;
+import org.telegram.ui.Cells.HeaderCell;
+import org.telegram.ui.Cells.SlideIntChooseView;
+import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.bots.BotCommandsMenuContainer;
 import org.telegram.ui.bots.BotCommandsMenuView;
 import org.telegram.ui.bots.BotKeyboardView;
@@ -590,6 +594,7 @@ public class ChatActivityEnterView extends FrameLayout implements
     private FrameLayout audioVideoButtonContainer;
     private boolean audioVideoButtonContainerForbidden;
     private ChatActivityEnterViewAnimatedIconView audioVideoSendButton;
+    private ImageView voicePitchButton;
     private boolean isInVideoMode;
     @Nullable
     private FrameLayout recordPanel;
@@ -3073,6 +3078,15 @@ public class ChatActivityEnterView extends FrameLayout implements
         sendButtonContainer.addView(audioVideoButtonContainer, LayoutHelper.createFrame(DEFAULT_HEIGHT, DEFAULT_HEIGHT, Gravity.RIGHT | Gravity.BOTTOM));
         audioVideoButtonContainer.setFocusable(true);
         audioVideoButtonContainer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+
+        voicePitchButton = new ImageView(context);
+        voicePitchButton.setScaleType(ImageView.ScaleType.CENTER);
+        voicePitchButton.setImageResource(R.drawable.msg_speed_medium);
+        voicePitchButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
+        voicePitchButton.setContentDescription(getString(R.string.MassgramVoicePitchTitle));
+        voicePitchButton.setOnClickListener(v -> showMassgramVoicePitchSheet());
+        sendButtonContainer.addView(voicePitchButton, LayoutHelper.createFrame(40, 40, Gravity.LEFT | Gravity.BOTTOM, 6, 0, 0, 4));
+        updateMassgramVoicePitchButtonState();
 
 //        audioVideoButtonContainer.setOnTouchListener((view, motionEvent) -> {
 //            createRecordCircle();
@@ -5811,6 +5825,87 @@ public class ChatActivityEnterView extends FrameLayout implements
         audioVideoSendButton.setContentDescription(getString(isInVideoMode() ? R.string.AccDescrVideoMessage : R.string.AccDescrVoiceMessage));
         audioVideoButtonContainer.setContentDescription(getString(isInVideoMode() ? R.string.AccDescrVideoMessage : R.string.AccDescrVoiceMessage));
         audioVideoSendButton.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED);
+        updateMassgramVoicePitchButtonState();
+    }
+
+    private void updateMassgramVoicePitchButtonState() {
+        if (voicePitchButton == null) {
+            return;
+        }
+        boolean visible = audioVideoButtonContainer != null
+            && audioVideoButtonContainer.getVisibility() == VISIBLE
+            && !recordingAudioVideo
+            && !isInVideoMode()
+            && !isLiveComment
+            && sendVoiceEnabled;
+        voicePitchButton.setVisibility(visible ? VISIBLE : GONE);
+        boolean enabled = MassgramConfigManager.getInstance().isVoicePitchEnabled() && MassgramConfigManager.getInstance().getVoicePitchSemitones() != 0;
+        int iconColor = enabled ? getThemedColor(Theme.key_chat_messagePanelSend) : getThemedColor(Theme.key_chat_messagePanelIcons);
+        voicePitchButton.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.MULTIPLY));
+        voicePitchButton.setAlpha(visible ? 1f : 0f);
+    }
+
+    private void showMassgramVoicePitchSheet() {
+        if (parentActivity == null) {
+            return;
+        }
+        BottomSheet.Builder builder = new BottomSheet.Builder(parentActivity, false, resourcesProvider);
+        builder.setApplyTopPadding(false);
+        builder.setApplyBottomPadding(false);
+
+        LinearLayout linearLayout = new LinearLayout(parentActivity);
+        linearLayout.setOrientation(LinearLayout.VERTICAL);
+
+        HeaderCell headerCell = new HeaderCell(parentActivity, resourcesProvider);
+        headerCell.setText(LocaleController.getString(R.string.MassgramVoicePitchTitle));
+        linearLayout.addView(headerCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextCheckCell toggleCell = new TextCheckCell(parentActivity, resourcesProvider);
+        toggleCell.setTextAndValueAndCheck(
+            LocaleController.getString(R.string.MassgramVoicePitchEnable),
+            LocaleController.getString(R.string.MassgramVoicePitchEnableInfo),
+            MassgramConfigManager.getInstance().isVoicePitchEnabled(),
+            true,
+            true
+        );
+        toggleCell.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL));
+        linearLayout.addView(toggleCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        SlideIntChooseView sliderView = new SlideIntChooseView(parentActivity, resourcesProvider);
+        sliderView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        sliderView.set(
+            MassgramConfigManager.getInstance().getVoicePitchSemitones(),
+            SlideIntChooseView.Options.make(0, -12, 12, value -> formatMassgramPitchValue(value)),
+            value -> {
+                MassgramConfigManager.getInstance().setVoicePitchSemitones(value);
+                updateMassgramVoicePitchButtonState();
+            }
+        );
+        linearLayout.addView(sliderView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView infoView = new TextView(parentActivity);
+        infoView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText4));
+        infoView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        infoView.setPadding(dp(22), dp(6), dp(22), dp(22));
+        infoView.setText(LocaleController.getString(R.string.MassgramVoicePitchInfo));
+        linearLayout.addView(infoView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        toggleCell.setOnClickListener(v -> {
+            boolean enabled = !MassgramConfigManager.getInstance().isVoicePitchEnabled();
+            MassgramConfigManager.getInstance().setVoicePitchEnabled(enabled);
+            toggleCell.setChecked(enabled);
+            updateMassgramVoicePitchButtonState();
+        });
+
+        builder.setCustomView(linearLayout);
+        builder.show();
+    }
+
+    private CharSequence formatMassgramPitchValue(int value) {
+        if (value == 0) {
+            return LocaleController.getString(R.string.MassgramVoicePitchNormal);
+        }
+        return String.format(Locale.US, "%+d st", value);
     }
 
     public boolean isRecordingAudioVideo() {
@@ -7500,6 +7595,7 @@ public class ChatActivityEnterView extends FrameLayout implements
 
     public void checkSendButton(boolean animated) {
         if (editingMessageObject != null || recordingAudioVideo) {
+            updateMassgramVoicePitchButtonState();
             return;
         }
         if (isPaused) {
@@ -8328,6 +8424,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 suggestButton.setTranslationX(shownSendButton ? -Math.max(0, sendButton.width() - dp(64)) : dp(42));
             }
         }
+        updateMassgramVoicePitchButtonState();
     }
 
     private void setSlowModeButtonVisible(boolean visible) {
@@ -9962,8 +10059,12 @@ public class ChatActivityEnterView extends FrameLayout implements
             botKeyboardView.updateColors();
         }
         audioVideoSendButton.setColorFilter(new PorterDuffColorFilter(audioVideoButtonContainerForbidden ? getThemedColor(Theme.key_glass_defaultIcon) : Color.WHITE, PorterDuff.Mode.SRC_IN));
+        if (voicePitchButton != null) {
+            voicePitchButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
+        }
         emojiButton.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_glass_defaultIcon), PorterDuff.Mode.SRC_IN));
         emojiButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector)));
+        updateMassgramVoicePitchButtonState();
     }
 
     private void updateRecordedDeleteIconColors() {

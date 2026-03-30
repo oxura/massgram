@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.3-beta1",
-    "versionCode":  65839,
+    "versionName":  "12.5.4-beta1",
+    "versionCode":  65859,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "9195ca40a9e2080c31874cb7559136c07b8c9a318e0ebb0a48f66b19289fe44b",
-    "apkSize":  131391267,
-    "changelog":  "Massgram beta 12.5.3-beta1\n\n- Added profile Massgram indicator\n- Added local AES chat encryption for private dialogs"
+    "sha256":  "d5eb5efed91308fff0fd54381690e1292fc0da8cc79838bc86ed00bc9ae57003",
+    "apkSize":  131424463,
+    "changelog":  "Massgram beta 12.5.4-beta1\n\n- Added voice pitch control for voice messages\n- Expanded UI limits for accounts and folders\n- Blocked sponsored messages and local stats\n- Fixed Massgram settings language pill\n- Added owner-only Massgram stats"
 }
 

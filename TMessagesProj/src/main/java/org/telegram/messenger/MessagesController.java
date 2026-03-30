@@ -1055,6 +1055,10 @@ public class MessagesController extends BaseController implements NotificationCe
         public boolean loading;
     }
 
+    private static final int MASSGRAM_DIALOG_FILTERS_LIMIT = 50;
+    private static final int MASSGRAM_DIALOG_FILTERS_CHATS_LIMIT = 500;
+    private static final int MASSGRAM_DIALOG_FILTERS_PINNED_LIMIT = 100;
+
     private class SendAsPeersInfo {
         private TLRPC.TL_channels_sendAsPeers sendAsPeers;
         private long loadTime;
@@ -1575,6 +1579,7 @@ public class MessagesController extends BaseController implements NotificationCe
         dialogFiltersChatsLimitPremium = mainPreferences.getInt("dialogFiltersChatsLimitPremium", 200);
         dialogFiltersPinnedLimitDefault = mainPreferences.getInt("dialogFiltersPinnedLimitDefault", 5);
         dialogFiltersPinnedLimitPremium = mainPreferences.getInt("dialogFiltersPinnedLimitPremium", 10);
+        applyMassgramExpandedUiLimits(null);
         publicLinksLimitDefault = mainPreferences.getInt("publicLinksLimitDefault", 10);
         publicLinksLimitPremium = mainPreferences.getInt("publicLinksLimitPremium", 20);
         captionLengthLimitDefault = mainPreferences.getInt("captionLengthLimitDefault", 1024);
@@ -4980,6 +4985,9 @@ public class MessagesController extends BaseController implements NotificationCe
         }
 
         if (changed) {
+            if (applyMassgramExpandedUiLimits(editor)) {
+                changed = true;
+            }
             editor.apply();
             AndroidUtilities.runOnUIThread(() -> {
                 getNotificationCenter().postNotificationName(NotificationCenter.appConfigUpdated);
@@ -20539,6 +20547,19 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public SponsoredMessagesInfo getSponsoredMessages(long dialogId) {
+        if (MassgramConfigManager.getInstance().isSponsoredMessagesBlocked()) {
+            SponsoredMessagesInfo info = sponsoredMessages.get(dialogId);
+            if (info == null) {
+                info = new SponsoredMessagesInfo();
+                sponsoredMessages.put(dialogId, info);
+            }
+            info.loading = false;
+            info.loadTime = SystemClock.elapsedRealtime();
+            info.posts_between = null;
+            info.messages = new ArrayList<>();
+            getNotificationCenter().postNotificationName(NotificationCenter.didLoadSponsoredMessages, dialogId, info.messages);
+            return info;
+        }
         SponsoredMessagesInfo info = sponsoredMessages.get(dialogId);
         if (info != null && (info.loading || Math.abs(SystemClock.elapsedRealtime() - info.loadTime) <= 5 * 60 * 1000)) {
             return info;
@@ -20635,6 +20656,56 @@ public class MessagesController extends BaseController implements NotificationCe
             });
         });
         return null;
+    }
+
+    private boolean applyMassgramExpandedUiLimits(SharedPreferences.Editor editor) {
+        if (!MassgramConfigManager.getInstance().isExpandedUiLimitsEnabled()) {
+            return false;
+        }
+        boolean changed = false;
+        if (dialogFiltersLimitDefault < MASSGRAM_DIALOG_FILTERS_LIMIT) {
+            dialogFiltersLimitDefault = MASSGRAM_DIALOG_FILTERS_LIMIT;
+            changed = true;
+            if (editor != null) {
+                editor.putInt("dialogFiltersLimitDefault", dialogFiltersLimitDefault);
+            }
+        }
+        if (dialogFiltersLimitPremium < MASSGRAM_DIALOG_FILTERS_LIMIT) {
+            dialogFiltersLimitPremium = MASSGRAM_DIALOG_FILTERS_LIMIT;
+            changed = true;
+            if (editor != null) {
+                editor.putInt("dialogFiltersLimitPremium", dialogFiltersLimitPremium);
+            }
+        }
+        if (dialogFiltersChatsLimitDefault < MASSGRAM_DIALOG_FILTERS_CHATS_LIMIT) {
+            dialogFiltersChatsLimitDefault = MASSGRAM_DIALOG_FILTERS_CHATS_LIMIT;
+            changed = true;
+            if (editor != null) {
+                editor.putInt("dialogFiltersChatsLimitDefault", dialogFiltersChatsLimitDefault);
+            }
+        }
+        if (dialogFiltersChatsLimitPremium < MASSGRAM_DIALOG_FILTERS_CHATS_LIMIT) {
+            dialogFiltersChatsLimitPremium = MASSGRAM_DIALOG_FILTERS_CHATS_LIMIT;
+            changed = true;
+            if (editor != null) {
+                editor.putInt("dialogFiltersChatsLimitPremium", dialogFiltersChatsLimitPremium);
+            }
+        }
+        if (dialogFiltersPinnedLimitDefault < MASSGRAM_DIALOG_FILTERS_PINNED_LIMIT) {
+            dialogFiltersPinnedLimitDefault = MASSGRAM_DIALOG_FILTERS_PINNED_LIMIT;
+            changed = true;
+            if (editor != null) {
+                editor.putInt("dialogFiltersPinnedLimitDefault", dialogFiltersPinnedLimitDefault);
+            }
+        }
+        if (dialogFiltersPinnedLimitPremium < MASSGRAM_DIALOG_FILTERS_PINNED_LIMIT) {
+            dialogFiltersPinnedLimitPremium = MASSGRAM_DIALOG_FILTERS_PINNED_LIMIT;
+            changed = true;
+            if (editor != null) {
+                editor.putInt("dialogFiltersPinnedLimitPremium", dialogFiltersPinnedLimitPremium);
+            }
+        }
+        return changed;
     }
 
     public void clearSendAsPeers() {

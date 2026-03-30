@@ -129,6 +129,9 @@ import javax.microedition.khronos.egl.EGLSurface;
 @SuppressLint("ViewConstructor")
 public class InstantCameraView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
 
+    private static final long MASSGRAM_MAX_ROUND_RECORD_MS = 3_600_000L;
+    private static final long MASSGRAM_MAX_ROUND_RECORD_US = MASSGRAM_MAX_ROUND_RECORD_MS * 1000L;
+
     public boolean WRITE_TO_FILE_IN_BACKGROUND;
 
     private int currentAccount = UserConfig.selectedAccount;
@@ -616,7 +619,7 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
         rect.set(x - dp(8), y - dp(8), x + cameraContainer.getMeasuredWidth() + dp(8), y + cameraContainer.getMeasuredHeight() + dp(8));
         if (recording) {
             recordedTime = System.currentTimeMillis() - recordStartTime + recordPlusTime;
-            progress = Math.min(1f, recordedTime / 60000.0f);
+            progress = Math.min(1f, recordedTime / (float) MASSGRAM_MAX_ROUND_RECORD_MS);
             invalidate();
         }
 
@@ -2494,10 +2497,10 @@ public class InstantCameraView extends FrameLayout implements NotificationCenter
                         for (int a = input.lastWroteBuffer; a <= input.results; a++) {
                             if (a < input.results) {
                                 long totalTime = input.offset[a] - audioStartTime;
-                                if (!running && (input.offset[a] >= videoLast - desyncTime || totalTime >= 60_000000)) {
+                                if (!running && (input.offset[a] >= videoLast - desyncTime || totalTime >= MASSGRAM_MAX_ROUND_RECORD_US)) {
                                     if (BuildVars.LOGS_ENABLED) {
-                                        if (totalTime >= 60_000000) {
-                                            FileLog.d("InstantCamera stop audio encoding because recorded time more than 60s");
+                                        if (totalTime >= MASSGRAM_MAX_ROUND_RECORD_US) {
+                                            FileLog.d("InstantCamera stop audio encoding because recorded time reached Massgram limit");
                                         } else {
                                             FileLog.d("InstantCamera stop audio encoding because of stoped video recording at " + input.offset[a] + " last video " + videoLast);
                                         }

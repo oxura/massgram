@@ -215,26 +215,41 @@ public class StatsController extends BaseController {
     }
 
     public void incrementReceivedItemsCount(int networkType, int dataType, int value) {
+        if (MassgramConfigManager.getInstance().isLocalStatsDisabled()) {
+            return;
+        }
         receivedItems[networkType][dataType] += value;
         saveStats();
     }
 
     public void incrementSentItemsCount(int networkType, int dataType, int value) {
+        if (MassgramConfigManager.getInstance().isLocalStatsDisabled()) {
+            return;
+        }
         sentItems[networkType][dataType] += value;
         saveStats();
     }
 
     public void incrementReceivedBytesCount(int networkType, int dataType, long value) {
+        if (MassgramConfigManager.getInstance().isLocalStatsDisabled()) {
+            return;
+        }
         receivedBytes[networkType][dataType] += value;
         saveStats();
     }
 
     public void incrementSentBytesCount(int networkType, int dataType, long value) {
+        if (MassgramConfigManager.getInstance().isLocalStatsDisabled()) {
+            return;
+        }
         sentBytes[networkType][dataType] += value;
         saveStats();
     }
 
     public void incrementTotalCallsTime(int networkType, int value) {
+        if (MassgramConfigManager.getInstance().isLocalStatsDisabled()) {
+            return;
+        }
         callsTotalTime[networkType] += value;
         saveStats();
     }

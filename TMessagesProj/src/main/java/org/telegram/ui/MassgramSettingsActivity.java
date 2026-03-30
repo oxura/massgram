@@ -26,6 +26,7 @@ import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.GhostModeManager;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
@@ -50,6 +51,9 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private static final int BUTTON_DISABLE_LINK_PREVIEWS = 5;
     private static final int BUTTON_CHECK_UPDATES = 6;
     private static final int BUTTON_CHECK_BETA_UPDATES = 7;
+    private static final int BUTTON_BLOCK_SPONSORED = 8;
+    private static final int BUTTON_DISABLE_LOCAL_STATS = 9;
+    private static final int BUTTON_OWNER_STATS = 10;
 
     private final HashSet<Integer> expandedInfoRows = new HashSet<>();
 
@@ -60,8 +64,11 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private MassgramSettingRow saveDeletedRow;
     private MassgramSettingRow relayCallsRow;
     private MassgramSettingRow disableLinkPreviewRow;
+    private MassgramSettingRow blockSponsoredRow;
+    private MassgramSettingRow disableLocalStatsRow;
     private MassgramActionRow updateRow;
     private MassgramActionRow betaUpdateRow;
+    private MassgramActionRow ownerStatsRow;
     private MassgramDeveloperCard developerCard;
 
     @Override
@@ -75,6 +82,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
     @Override
     public void onResume() {
         super.onResume();
+        ensureLanguagePill(getContext());
         bindSettingsContent();
     }
 
@@ -101,12 +109,18 @@ public class MassgramSettingsActivity extends UniversalFragment {
     }
 
     private void ensureLanguagePill(Context context) {
-        if (languagePillView != null) {
-            updateLanguagePill();
+        if (context == null) {
             return;
         }
-        languagePillView = new LanguagePillView(context);
-        actionBar.addView(languagePillView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 34, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 12, 0));
+        if (languagePillView == null) {
+            languagePillView = new LanguagePillView(context);
+        }
+        if (languagePillView.getParent() != actionBar) {
+            if (languagePillView.getParent() instanceof ViewGroup) {
+                ((ViewGroup) languagePillView.getParent()).removeView(languagePillView);
+            }
+            actionBar.addView(languagePillView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 34, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 12, 0));
+        }
         updateLanguagePill();
     }
 
@@ -132,10 +146,14 @@ public class MassgramSettingsActivity extends UniversalFragment {
         saveDeletedRow = new MassgramSettingRow(context, R.drawable.msg_delete);
         relayCallsRow = new MassgramSettingRow(context, R.drawable.outline_shield_lock_24);
         disableLinkPreviewRow = new MassgramSettingRow(context, R.drawable.msg_link);
+        blockSponsoredRow = new MassgramSettingRow(context, R.drawable.outline_shield_check);
+        disableLocalStatsRow = new MassgramSettingRow(context, R.drawable.mini_stats);
         privacyCard.addView(ghostModeRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(saveDeletedRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(relayCallsRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(disableLinkPreviewRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        privacyCard.addView(blockSponsoredRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        privacyCard.addView(disableLocalStatsRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         settingsContentView.addView(privacyCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         settingsContentView.addView(createSpacer(context, 14));
@@ -147,6 +165,10 @@ public class MassgramSettingsActivity extends UniversalFragment {
         if (isCurrentAccountBetaTester()) {
             betaUpdateRow = new MassgramActionRow(context, R.drawable.msg_download_settings);
             updatesCard.addView(betaUpdateRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        }
+        if (isOwnerAccount()) {
+            ownerStatsRow = new MassgramActionRow(context, R.drawable.msg_stats);
+            updatesCard.addView(ownerStatsRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         }
         settingsContentView.addView(updatesCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
@@ -163,6 +185,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
         if (settingsContentView == null) {
             return;
         }
+        ensureLanguagePill(getContext());
         actionBar.setTitle(getTitle());
         updateLanguagePill();
         if (languagePillView != null) {
@@ -170,6 +193,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
         }
 
         GhostModeManager ghostModeManager = GhostModeManager.getInstance();
+        MassgramConfigManager configManager = MassgramConfigManager.getInstance();
         final boolean glassSupported = LiteMode.supportsLiquidGlass();
 
         bindRow(
@@ -234,13 +258,39 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 refreshSettingsState();
             }
         );
+        bindRow(
+            blockSponsoredRow,
+            BUTTON_BLOCK_SPONSORED,
+            LocaleController.getString(R.string.MassgramBlockSponsored),
+            LocaleController.getString(R.string.MassgramBlockSponsoredInfo),
+            configManager.isSponsoredMessagesBlocked(),
+            true,
+            false,
+            () -> {
+                configManager.setSponsoredMessagesBlocked(!configManager.isSponsoredMessagesBlocked());
+                refreshSettingsState();
+            }
+        );
+        bindRow(
+            disableLocalStatsRow,
+            BUTTON_DISABLE_LOCAL_STATS,
+            LocaleController.getString(R.string.MassgramDisableLocalStats),
+            LocaleController.getString(R.string.MassgramDisableLocalStatsInfo),
+            configManager.isLocalStatsDisabled(),
+            true,
+            true,
+            () -> {
+                configManager.setLocalStatsDisabled(!configManager.isLocalStatsDisabled());
+                refreshSettingsState();
+            }
+        );
         if (updateRow != null) {
             updateRow.bind(
                 BUTTON_CHECK_UPDATES,
                 LocaleController.getString(R.string.MassgramCheckUpdates),
                 LocaleController.formatString("MassgramCurrentVersion", R.string.MassgramCurrentVersion, BuildVars.BUILD_VERSION_STRING),
                 LocaleController.getString(R.string.Update),
-                betaUpdateRow == null,
+                betaUpdateRow == null && ownerStatsRow == null,
                 this::checkForUpdates
             );
         }
@@ -252,6 +302,16 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 LocaleController.getString(R.string.Update),
                 true,
                 this::checkForBetaUpdates
+            );
+        }
+        if (ownerStatsRow != null) {
+            ownerStatsRow.bind(
+                BUTTON_OWNER_STATS,
+                LocaleController.getString(R.string.MassgramOwnerStats),
+                LocaleController.getString(R.string.MassgramOwnerStatsInfo),
+                LocaleController.getString(R.string.Open),
+                true,
+                () -> presentFragment(new MassgramOwnerStatsActivity())
             );
         }
         if (developerCard != null) {
@@ -373,6 +433,10 @@ public class MassgramSettingsActivity extends UniversalFragment {
         return ApplicationLoader.applicationLoaderInstance.isBetaTester(UserConfig.getInstance(currentAccount).getClientUserId());
     }
 
+    private boolean isOwnerAccount() {
+        return MassgramConfigManager.getInstance().isOwner(UserConfig.getInstance(currentAccount).getClientUserId());
+    }
+
     private void updateLanguagePill() {
         if (languagePillView == null) {
             return;
@@ -404,6 +468,14 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 }
             }, 16);
         }
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        if (languagePillView != null && languagePillView.getParent() instanceof ViewGroup) {
+            ((ViewGroup) languagePillView.getParent()).removeView(languagePillView);
+        }
+        super.onFragmentDestroy();
     }
 
     private void openTelegramContact(String username) {
