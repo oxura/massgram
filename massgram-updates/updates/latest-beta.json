@@ -4,6 +4,6 @@
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
     "sha256":  "9195ca40a9e2080c31874cb7559136c07b8c9a318e0ebb0a48f66b19289fe44b",
     "apkSize":  131391267,
-    "changelog":  "Massgram beta 12.5.3-beta1`n`n- Added profile Massgram indicator`n- Added local AES chat encryption for private dialogs"
+    "changelog":  "Massgram beta 12.5.3-beta1\n\n- Added profile Massgram indicator\n- Added local AES chat encryption for private dialogs"
 }
 
