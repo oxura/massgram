@@ -35,6 +35,12 @@ import java.io.File;
 
 public class ApplicationLoaderImpl extends ApplicationLoader {
     @Override
+    public void onCreate() {
+        super.onCreate();
+        MassgramUpdateManager.getInstance().initialize();
+    }
+
+    @Override
     protected String onGetApplicationId() {
         return BuildConfig.APPLICATION_ID;
     }
@@ -111,6 +117,61 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
     @Override
     public IUpdateLayout takeUpdateLayout(Activity activity, ViewGroup sideMenuContainer) {
         return new UpdateLayout(activity, sideMenuContainer);
+    }
+
+    @Override
+    public boolean isCustomUpdate() {
+        return true;
+    }
+
+    @Override
+    public boolean hasCustomUpdateConfig() {
+        return MassgramUpdateManager.getInstance().isConfigured();
+    }
+
+    @Override
+    public void downloadUpdate() {
+        MassgramUpdateManager.getInstance().downloadUpdate();
+    }
+
+    @Override
+    public void cancelDownloadingUpdate() {
+        MassgramUpdateManager.getInstance().cancelDownloadingUpdate();
+    }
+
+    @Override
+    public boolean isDownloadingUpdate() {
+        return MassgramUpdateManager.getInstance().isDownloadingUpdate();
+    }
+
+    @Override
+    public float getDownloadingUpdateProgress() {
+        return MassgramUpdateManager.getInstance().getDownloadingUpdateProgress();
+    }
+
+    @Override
+    public void checkUpdate(boolean force, Runnable whenDone) {
+        MassgramUpdateManager.getInstance().checkUpdate(force, whenDone);
+    }
+
+    @Override
+    public BetaUpdate getUpdate() {
+        return MassgramUpdateManager.getInstance().getUpdate();
+    }
+
+    @Override
+    public String getLastUpdateError() {
+        return MassgramUpdateManager.getInstance().getLastUpdateError();
+    }
+
+    @Override
+    public File getDownloadedUpdateFile() {
+        return MassgramUpdateManager.getInstance().getDownloadedUpdateFile();
+    }
+
+    @Override
+    public boolean showCustomUpdateAppPopup(Context context, BetaUpdate update, int account) {
+        return MassgramUpdateManager.getInstance().showUpdatePopup(context, update);
     }
 
     @Override

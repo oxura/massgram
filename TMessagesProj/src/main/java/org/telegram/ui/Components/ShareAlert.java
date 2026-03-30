@@ -1820,7 +1820,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
 
         fadeDrawable = new BlurredBackgroundWithFadeDrawable(
                 iBlur3FactoryFade.create(bottomFadeView, null));
-        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) || true) {
+        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) {
             fadeDrawable.setFadeHeight(dp(72), true);
         }
 

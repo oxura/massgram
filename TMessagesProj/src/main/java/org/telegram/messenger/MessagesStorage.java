@@ -5442,6 +5442,87 @@ public class MessagesStorage extends BaseController {
         });
     }
 
+    public void markMessagesDeletedBySender(long dialogId, ArrayList<Integer> messages, boolean useQueue) {
+        if (messages == null || messages.isEmpty()) {
+            return;
+        }
+        if (useQueue) {
+            storageQueue.postRunnable(() -> markMessagesDeletedBySenderInternal(dialogId, messages));
+        } else {
+            markMessagesDeletedBySenderInternal(dialogId, messages);
+        }
+    }
+
+    private void markMessagesDeletedBySenderInternal(long dialogId, ArrayList<Integer> messages) {
+        SQLitePreparedStatement state = null;
+        try {
+            database.beginTransaction();
+            for (int i = 0; i < messages.size(); i++) {
+                int messageId = messages.get(i);
+                markMessageDeletedBySenderInTable("messages_v2", dialogId, messageId);
+                markMessageDeletedBySenderInTable("messages_topics", dialogId, messageId);
+            }
+            database.commitTransaction();
+        } catch (Exception e) {
+            checkSQLException(e);
+        } finally {
+            if (database != null) {
+                database.commitTransaction();
+            }
+            if (state != null) {
+                state.dispose();
+            }
+        }
+    }
+
+    private void markMessageDeletedBySenderInTable(String table, long dialogId, int messageId) throws Exception {
+        SQLiteCursor cursor = null;
+        SQLitePreparedStatement state = null;
+        try {
+            if (dialogId == 0) {
+                cursor = database.queryFinalized("SELECT uid, custom_params FROM " + table + " WHERE mid = ?", messageId);
+            } else {
+                cursor = database.queryFinalized("SELECT uid, custom_params FROM " + table + " WHERE mid = ? AND uid = ?", messageId, dialogId);
+            }
+            while (cursor.next()) {
+                long targetDialogId = dialogId == 0 ? cursor.longValue(0) : dialogId;
+                NativeByteBuffer customParams = cursor.byteBufferValue(1);
+                TLRPC.Message message = new TLRPC.TL_message();
+                MessageCustomParamsHelper.readLocalParams(message, customParams);
+                if (customParams != null) {
+                    customParams.reuse();
+                }
+                if (message.isDeletedBySender) {
+                    continue;
+                }
+                message.isDeletedBySender = true;
+                state = database.executeFast("UPDATE " + table + " SET custom_params = ? WHERE mid = ? AND uid = ?");
+                state.requery();
+                NativeByteBuffer nativeByteBuffer = MessageCustomParamsHelper.writeLocalParams(message);
+                if (nativeByteBuffer != null) {
+                    state.bindByteBuffer(1, nativeByteBuffer);
+                } else {
+                    state.bindNull(1);
+                }
+                state.bindInteger(2, messageId);
+                state.bindLong(3, targetDialogId);
+                state.step();
+                state.dispose();
+                state = null;
+                if (nativeByteBuffer != null) {
+                    nativeByteBuffer.reuse();
+                }
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+            if (state != null) {
+                state.dispose();
+            }
+        }
+    }
+
     public TLRPC.Message getMessageWithCustomParamsOnlyInternal(int messageId, long dialogId) {
         TLRPC.Message message = new TLRPC.TL_message();
         SQLiteCursor cursor = null;
@@ -7554,12 +7635,17 @@ public class MessagesStorage extends BaseController {
         storageQueue.postRunnable(() -> {
             SQLiteCursor cursor = null;
             try {
-                cursor = database.queryFinalized("SELECT data FROM messages_v2 WHERE uid = " + dialogId + " AND mid = " + msgId + " LIMIT 1");
+                cursor = database.queryFinalized("SELECT data, custom_params FROM messages_v2 WHERE uid = " + dialogId + " AND mid = " + msgId + " LIMIT 1");
                 while (cursor.next()) {
                     NativeByteBuffer data = cursor.byteBufferValue(0);
                     if (data != null) {
                         TLRPC.Message message = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
                         data.reuse();
+                        NativeByteBuffer customParams = cursor.byteBufferValue(1);
+                        if (customParams != null) {
+                            MessageCustomParamsHelper.readLocalParams(message, customParams);
+                            customParams.reuse();
+                        }
                         ref.set(message);
                     }
                 }

@@ -9141,6 +9141,46 @@ public class MessagesController extends BaseController implements NotificationCe
         }
     }
 
+    private void markMessageDeletedBySender(MessageObject obj) {
+        if (obj == null) {
+            return;
+        }
+        obj.isDeletedBySender = true;
+        obj.forceUpdate = true;
+        if (obj.messageOwner != null) {
+            obj.messageOwner.isDeletedBySender = true;
+        }
+    }
+
+    private ArrayList<MessageObject> markMessagesDeletedBySenderInMemory(long dialogId, ArrayList<Integer> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return null;
+        }
+        HashSet<Integer> messageIds = new HashSet<>(messages);
+        ArrayList<MessageObject> changedObjects = new ArrayList<>();
+        if (dialogId == 0) {
+            for (int i = 0; i < messages.size(); i++) {
+                MessageObject obj = dialogMessagesByIds.get(messages.get(i));
+                if (obj != null && !obj.isDeletedBySender) {
+                    markMessageDeletedBySender(obj);
+                    changedObjects.add(obj);
+                }
+            }
+        } else {
+            ArrayList<MessageObject> objs = dialogMessage.get(dialogId);
+            if (objs != null) {
+                for (int i = 0; i < objs.size(); i++) {
+                    MessageObject obj = objs.get(i);
+                    if (obj != null && messageIds.contains(obj.getId()) && !obj.isDeletedBySender) {
+                        markMessageDeletedBySender(obj);
+                        changedObjects.add(obj);
+                    }
+                }
+            }
+        }
+        return changedObjects.isEmpty() ? null : changedObjects;
+    }
+
     public void deleteMessages(ArrayList<Integer> messages, ArrayList<Long> randoms, TLRPC.EncryptedChat encryptedChat, long dialogId, int topicId, boolean forAll, int mode) {
         deleteMessages(messages, randoms, encryptedChat, dialogId, forAll, mode, false, 0, null, topicId);
     }
@@ -10092,7 +10132,14 @@ public class MessagesController extends BaseController implements NotificationCe
         checkReadTasks();
 
         if (getUserConfig().isClientActivated()) {
-            if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
+            if (GhostModeManager.getInstance().shouldBlockPresenceUpdates()) {
+                if (statusRequest != 0) {
+                    getConnectionsManager().cancelRequest(statusRequest, true);
+                    statusRequest = 0;
+                }
+                offlineSent = true;
+                statusSettingState = 0;
+            } else if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
                 if (ApplicationLoader.mainInterfacePausedStageQueueTime != 0 && Math.abs(ApplicationLoader.mainInterfacePausedStageQueueTime - System.currentTimeMillis()) > 1000) {
                     if (statusSettingState != 1 && (lastStatusUpdateTime == 0 || Math.abs(System.currentTimeMillis() - lastStatusUpdateTime) >= 55000 || offlineSent)) {
                         statusSettingState = 1;
@@ -10951,6 +10998,9 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public boolean sendTyping(long dialogId, long threadMsgId, int action, String emojicon, int classGuid) {
         if (action < 0 || action >= sendingTypings.length || dialogId == 0) {
+            return false;
+        }
+        if (GhostModeManager.getInstance().isGhostModeEnabled()) {
             return false;
         }
         final long selfId = UserConfig.getInstance(UserConfig.selectedAccount).getClientUserId();
@@ -14024,6 +14074,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     private void completeReadTask(ReadTask task) {
+        if (GhostModeManager.getInstance().shouldBlockReadReceipts()) {
+            return;
+        }
         if (task.replyId != 0 && task.monoForumPeerId == 0) {
             TLRPC.TL_messages_readDiscussion req = new TLRPC.TL_messages_readDiscussion();
             req.msg_id = (int) task.replyId;
@@ -14130,16 +14183,19 @@ public class MessagesController extends BaseController implements NotificationCe
             return;
         }
         getMessagesStorage().resetMentionsCount(dialogId, topicId, 0);
-        TLRPC.TL_messages_readMentions req = new TLRPC.TL_messages_readMentions();
-        req.peer = getInputPeer(dialogId);
-        if (topicId != 0) {
-            req.top_msg_id = (int) topicId;
-            req.flags |= 1;
+        if (!GhostModeManager.getInstance().shouldBlockReadReceipts()) {
+            TLRPC.TL_messages_readMentions req = new TLRPC.TL_messages_readMentions();
+            req.peer = getInputPeer(dialogId);
+            if (topicId != 0) {
+                req.top_msg_id = (int) topicId;
+                req.flags |= 1;
+            }
+            getConnectionsManager().sendRequest(req, null);
         }
-        getConnectionsManager().sendRequest(req, null);
     }
 
     public void markDialogAsRead(long dialogId, int maxPositiveId, int maxNegativeId, int maxDate, boolean popup, long threadId, int countDiff, boolean readNow, int scheduledCount) {
+        boolean blockReadReceipts = GhostModeManager.getInstance().shouldBlockReadReceipts();
         boolean createReadTask;
 
         if (threadId != 0) {
@@ -14248,11 +14304,15 @@ public class MessagesController extends BaseController implements NotificationCe
                     getNotificationsController().processDialogsUpdateRead(dialogsToUpdate);
                 }));
 
-                if (chat != null && chat.ttl > 0) {
+                if (!blockReadReceipts && chat != null && chat.ttl > 0) {
                     int serverTime = Math.max(getConnectionsManager().getCurrentTime(), maxDate);
                     getMessagesStorage().createTaskForSecretChat(chat.id, maxDate, serverTime, 0, null);
                 }
             }
+        }
+
+        if (blockReadReceipts) {
+            createReadTask = false;
         }
 
         final long monoForumPeerId;
@@ -17552,6 +17612,26 @@ public class MessagesController extends BaseController implements NotificationCe
         return updated;
     }
 
+    private void applyMassgramEditHistory(TLRPC.Message message) {
+        TLRPC.Message previousMessage = null;
+        MessageObject cachedMessage = dialogMessagesByIds.get(message.id);
+        if (cachedMessage != null && cachedMessage.messageOwner != null && MessageObject.getDialogId(cachedMessage.messageOwner) == message.dialog_id) {
+            previousMessage = cachedMessage.messageOwner;
+        } else {
+            previousMessage = getMessagesStorage().getMessage(message.dialog_id, message.id);
+        }
+        if (previousMessage == null) {
+            return;
+        }
+        MessageCustomParamsHelper.copyParams(previousMessage, message);
+        String oldText = previousMessage.message != null ? previousMessage.message : "";
+        String newText = message.message != null ? message.message : "";
+        if (!TextUtils.equals(oldText, newText)) {
+            // Храним последнюю локально известную версию текста, чтобы её можно было открыть из action mode.
+            message.previousMessageText = oldText;
+        }
+    }
+
     public boolean processUpdateArray(ArrayList<TLRPC.Update> updates, ArrayList<TLRPC.User> usersArr, ArrayList<TLRPC.Chat> chatsArr, boolean fromGetDifference, int date) {
         if (updates.isEmpty()) {
             if (usersArr != null || chatsArr != null) {
@@ -18625,6 +18705,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     message.message = "";
                     message.attachPath = "";
                 }
+                applyMassgramEditHistory(message);
 
                 ImageLoader.saveMessageThumbs(message);
                 AndroidUtilities.runOnUIThread(()-> getSendMessagesHelper().onMessageEdited(message));
@@ -20060,28 +20141,36 @@ public class MessagesController extends BaseController implements NotificationCe
                     if (arrayList == null) {
                         continue;
                     }
-                    getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, arrayList, -dialogId, false);
-                    if (dialogId == 0) {
-                        for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
-                            Integer id = arrayList.get(b);
-                            MessageObject obj = dialogMessagesByIds.get(id);
-                            if (obj != null) {
-                                if (BuildVars.LOGS_ENABLED) {
-                                    FileLog.d("mark messages " + obj.getId() + " deleted");
-                                }
-                                obj.deleted = true;
-                            }
+                    if (GhostModeManager.getInstance().isSaveDeletedMessagesEnabled()) {
+                        ArrayList<MessageObject> changedObjects = markMessagesDeletedBySenderInMemory(dialogId, arrayList);
+                        if (changedObjects != null && !changedObjects.isEmpty()) {
+                            getNotificationCenter().postNotificationName(NotificationCenter.replaceMessagesObjects, dialogId, changedObjects);
                         }
+                        getNotificationCenter().postNotificationName(NotificationCenter.massgramMessagesMarkedDeleted, dialogId, arrayList);
                     } else {
-                        ArrayList<MessageObject> objs = dialogMessage.get(dialogId);
-                        if (objs != null) {
-                            for (int i = 0; i < objs.size(); ++i) {
-                                MessageObject obj = objs.get(i);
+                        getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, arrayList, -dialogId, false);
+                        if (dialogId == 0) {
+                            for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
+                                Integer id = arrayList.get(b);
+                                MessageObject obj = dialogMessagesByIds.get(id);
                                 if (obj != null) {
-                                    for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
-                                        if (obj.getId() == arrayList.get(b)) {
-                                            obj.deleted = true;
-                                            break;
+                                    if (BuildVars.LOGS_ENABLED) {
+                                        FileLog.d("mark messages " + obj.getId() + " deleted");
+                                    }
+                                    obj.deleted = true;
+                                }
+                            }
+                        } else {
+                            ArrayList<MessageObject> objs = dialogMessage.get(dialogId);
+                            if (objs != null) {
+                                for (int i = 0; i < objs.size(); ++i) {
+                                    MessageObject obj = objs.get(i);
+                                    if (obj != null) {
+                                        for (int b = 0, size2 = arrayList.size(); b < size2; b++) {
+                                            if (obj.getId() == arrayList.get(b)) {
+                                                obj.deleted = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -20089,7 +20178,9 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                 }
-                getNotificationsController().removeDeletedMessagesFromNotifications(deletedMessagesFinal, false);
+                if (!GhostModeManager.getInstance().isSaveDeletedMessagesEnabled()) {
+                    getNotificationsController().removeDeletedMessagesFromNotifications(deletedMessagesFinal, false);
+                }
             }
             if (deletedQuickRepliesMessagesFinal != null) {
                 for (int a = 0, size = deletedQuickRepliesMessagesFinal.size(); a < size; a++) {
@@ -20177,10 +20268,14 @@ public class MessagesController extends BaseController implements NotificationCe
             for (int a = 0, size = deletedMessages.size(); a < size; a++) {
                 long key = deletedMessages.keyAt(a);
                 ArrayList<Integer> arrayList = deletedMessages.valueAt(a);
-                getMessagesStorage().getStorageQueue().postRunnable(() -> {
-                    ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
-                    getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds, false);
-                });
+                if (GhostModeManager.getInstance().isSaveDeletedMessagesEnabled()) {
+                    getMessagesStorage().markMessagesDeletedBySender(key, arrayList, true);
+                } else {
+                    getMessagesStorage().getStorageQueue().postRunnable(() -> {
+                        ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
+                        getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds, false);
+                    });
+                }
             }
         }
         if (deletedQuickReplyMessages != null) {
@@ -20423,21 +20518,23 @@ public class MessagesController extends BaseController implements NotificationCe
             topicsController.markAllReactionsAsRead(-dialogId, topicId);
         }
         getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, 0);
-        TLRPC.TL_messages_readReactions req = new TLRPC.TL_messages_readReactions();
-        req.peer = getInputPeer(dialogId);
+        if (!GhostModeManager.getInstance().shouldBlockReadReceipts()) {
+            TLRPC.TL_messages_readReactions req = new TLRPC.TL_messages_readReactions();
+            req.peer = getInputPeer(dialogId);
 
-        if (topicId != 0) {
-            if (isMonoForum(dialogId)) {
-                req.saved_peer_id = getInputPeer(topicId);
-                req.flags |= 2;
-            } else {
-                req.top_msg_id = (int) topicId;
-                req.flags |= 1;
+            if (topicId != 0) {
+                if (isMonoForum(dialogId)) {
+                    req.saved_peer_id = getInputPeer(topicId);
+                    req.flags |= 2;
+                } else {
+                    req.top_msg_id = (int) topicId;
+                    req.flags |= 1;
+                }
             }
-        }
-        getConnectionsManager().sendRequest(req, (response, error) -> {
+            getConnectionsManager().sendRequest(req, (response, error) -> {
 
-        });
+            });
+        }
         NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, UPDATE_MASK_REACTIONS_READ);
     }
 

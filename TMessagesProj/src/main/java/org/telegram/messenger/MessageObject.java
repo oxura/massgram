@@ -207,6 +207,7 @@ public class MessageObject {
     public int dateKeyInt;
     public String monthKey;
     public boolean deleted;
+    public boolean isDeletedBySender;
     public boolean deletedByThanos;
     public float audioProgress;
     public float forceSeekTo = -1;
@@ -1802,6 +1803,7 @@ public class MessageObject {
         localUserName = userName;
         messageText = formattedMessage;
         messageOwner = message;
+        isDeletedBySender = message != null && message.isDeletedBySender;
         localChannel = isChannel;
         localSupergroup = supergroup;
         localEdit = edit;
@@ -1857,6 +1859,7 @@ public class MessageObject {
 
         currentAccount = accountNum;
         messageOwner = message;
+        isDeletedBySender = message != null && message.isDeletedBySender;
         replyMessageObject = replyToMessage;
         eventId = eid;
         wasUnread = !messageOwner.out && messageOwner.unread;
@@ -9166,6 +9169,14 @@ public class MessageObject {
 
     public boolean isEdited() {
         return messageOwner != null && (messageOwner.flags & TLRPC.MESSAGE_FLAG_EDITED) != 0 && messageOwner.edit_date != 0 && !messageOwner.edit_hide;
+    }
+
+    public boolean hasPreviousMessageVersion() {
+        return messageOwner != null && messageOwner.previousMessageText != null;
+    }
+
+    public String getPreviousMessageText() {
+        return messageOwner != null ? messageOwner.previousMessageText : null;
     }
 
     public boolean isContentUnread() {

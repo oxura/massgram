@@ -1,0 +1,9 @@
+﻿{
+    "versionName":  "12.5.1",
+    "versionCode":  65819,
+    "apkUrl":  "https://github.com/oxura/massgram/releases/latest/download/massgram.apk",
+    "sha256":  "fd2da0d7495d7dc0f5418632ad3587d11ba96947d9e1f34962e831200bb29868",
+    "apkSize":  131410209,
+    "changelog":  "Massgram update\n\n- Initial custom updater integration for GitHub Releases."
+}
+

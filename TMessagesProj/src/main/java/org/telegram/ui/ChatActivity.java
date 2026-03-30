@@ -103,6 +103,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.Space;
 import android.widget.TextView;
 
@@ -155,6 +156,7 @@ import org.telegram.messenger.FactCheckController;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.FlagSecureReason;
+import org.telegram.messenger.GhostModeManager;
 import org.telegram.messenger.HashtagSearchController;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageLocation;
@@ -1594,6 +1596,7 @@ public class ChatActivity extends BaseFragment implements
     private final static int charge_fee = 72;
 
     private final static int chat_menu_topic_create = 73;
+    private final static int view_previous_edit = 75;
 
     private final static int id_chat_compose_panel = 1000;
 
@@ -2163,7 +2166,7 @@ public class ChatActivity extends BaseFragment implements
 
         @Override
         public void needSendTyping() {
-            if (chatMode == MODE_QUICK_REPLIES || chatMode == MODE_EDIT_BUSINESS_LINK || chatMode == MODE_SUGGESTIONS) return;
+            if (chatMode == MODE_QUICK_REPLIES || chatMode == MODE_EDIT_BUSINESS_LINK || chatMode == MODE_SUGGESTIONS || GhostModeManager.getInstance().isGhostModeEnabled()) return;
             getMessagesController().sendTyping(dialog_id, threadMessageId, 0, classGuid);
         }
 
@@ -2825,6 +2828,7 @@ public class ChatActivity extends BaseFragment implements
         getNotificationCenter().addObserver(this, NotificationCenter.voiceTranscriptionUpdate);
         getNotificationCenter().addObserver(this, NotificationCenter.animatedEmojiDocumentLoaded);
         getNotificationCenter().addObserver(this, NotificationCenter.replaceMessagesObjects);
+        getNotificationCenter().addObserver(this, NotificationCenter.massgramMessagesMarkedDeleted);
         getNotificationCenter().addObserver(this, NotificationCenter.notificationsSettingsUpdated);
         getNotificationCenter().addObserver(this, NotificationCenter.replyMessagesDidLoad);
         getNotificationCenter().addObserver(this, NotificationCenter.didReceivedWebpages);
@@ -2838,6 +2842,7 @@ public class ChatActivity extends BaseFragment implements
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewWallpapper);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didApplyNewTheme);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.goingToPreviewTheme);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.massgramSettingsChanged);
         getNotificationCenter().addObserver(this, NotificationCenter.channelRightsUpdated);
         getNotificationCenter().addObserver(this, NotificationCenter.audioRecordTooShort);
         getNotificationCenter().addObserver(this, NotificationCenter.didUpdateReactions);
@@ -3302,6 +3307,7 @@ public class ChatActivity extends BaseFragment implements
         getNotificationCenter().removeObserver(this, NotificationCenter.voiceTranscriptionUpdate);
         getNotificationCenter().removeObserver(this, NotificationCenter.animatedEmojiDocumentLoaded);
         getNotificationCenter().removeObserver(this, NotificationCenter.replaceMessagesObjects);
+        getNotificationCenter().removeObserver(this, NotificationCenter.massgramMessagesMarkedDeleted);
         getNotificationCenter().removeObserver(this, NotificationCenter.notificationsSettingsUpdated);
         getNotificationCenter().removeObserver(this, NotificationCenter.replyMessagesDidLoad);
         getNotificationCenter().removeObserver(this, NotificationCenter.didReceivedWebpages);
@@ -3324,6 +3330,7 @@ public class ChatActivity extends BaseFragment implements
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewWallpapper);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didApplyNewTheme);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.goingToPreviewTheme);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.massgramSettingsChanged);
         getNotificationCenter().removeObserver(this, NotificationCenter.channelRightsUpdated);
         getNotificationCenter().removeObserver(this, NotificationCenter.updateMentionsCount);
         getNotificationCenter().removeObserver(this, NotificationCenter.audioRecordTooShort);
@@ -3728,6 +3735,8 @@ public class ChatActivity extends BaseFragment implements
                         undoView.showWithAction(0, UndoView.ACTION_TEXT_COPIED, null);
                     }
                     clearSelectionMode();
+                } else if (id == view_previous_edit) {
+                    showPreviousMessageVersionDialog(getSingleSelectedMessageWithPreviousVersion());
                 } else if (id == delete) {
                     if (getParentActivity() == null) {
                         return;
@@ -4502,14 +4511,14 @@ public class ChatActivity extends BaseFragment implements
 
         BlurredBackgroundWithFadeDrawable fadeDrawable = new BlurredBackgroundWithFadeDrawable(
                 navbarContentDrawableFactory.create(chatInputViewsContainer, null));
-        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) || true) {
+        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) {
             fadeDrawable.setFadeHeight(dp(72), true);
         }
 
         BlurredBackgroundWithFadeDrawable fadeDrawableTop = new BlurredBackgroundWithFadeDrawable(
             navbarContentDrawableFactory.create(topPanelLayoutFade, null));
 
-        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) || true) {
+        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) {
             fadeDrawableTop.setFadeHeight(-dp(72), true);
         } else {
             fadeDrawableTop.setFadeHeight(-dp(48), false);
@@ -10011,6 +10020,7 @@ public class ChatActivity extends BaseFragment implements
             }
             actionModeViews.add(actionMode.addItemWithWidth(star, R.drawable.msg_fave, AndroidUtilities.dp(54), LocaleController.getString(R.string.AddToFavorites)));
             actionModeViews.add(actionMode.addItemWithWidth(copy, R.drawable.msg_copy, AndroidUtilities.dp(54), LocaleController.getString(R.string.Copy)));
+            actionModeViews.add(actionMode.addItemWithWidth(view_previous_edit, R.drawable.msg_views, AndroidUtilities.dp(54), LocaleController.getString(R.string.MassgramViewPreviousEdit)));
             if (!isSavedMessages && getDialogId() != UserObject.VERIFY) {
                 actionModeViews.add(actionMode.addItemWithWidth(forward, R.drawable.msg_forward, AndroidUtilities.dp(54), LocaleController.getString(R.string.Forward)));
             }
@@ -10020,14 +10030,96 @@ public class ChatActivity extends BaseFragment implements
             actionModeViews.add(actionMode.addItemWithWidth(edit, R.drawable.msg_edit, AndroidUtilities.dp(54), LocaleController.getString(R.string.Edit)));
             actionModeViews.add(actionMode.addItemWithWidth(star, R.drawable.msg_fave, AndroidUtilities.dp(54), LocaleController.getString(R.string.AddToFavorites)));
             actionModeViews.add(actionMode.addItemWithWidth(copy, R.drawable.msg_copy, AndroidUtilities.dp(54), LocaleController.getString(R.string.Copy)));
+            actionModeViews.add(actionMode.addItemWithWidth(view_previous_edit, R.drawable.msg_views, AndroidUtilities.dp(54), LocaleController.getString(R.string.MassgramViewPreviousEdit)));
             actionModeViews.add(actionMode.addItemWithWidth(delete, R.drawable.msg_delete, AndroidUtilities.dp(54), LocaleController.getString(R.string.Delete)));
         }
         actionMode.setItemVisibility(edit, canEditMessagesCount == 1 && selectedMessagesIds[0].size() + selectedMessagesIds[1].size() == 1 ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(copy, !isPeerNoForwards() && selectedMessagesCanCopyIds[0].size() + selectedMessagesCanCopyIds[1].size() != 0 ? View.VISIBLE : View.GONE);
+        actionMode.setItemVisibility(view_previous_edit, getSingleSelectedMessageWithPreviousVersion() != null ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(star, selectedMessagesCanStarIds[0].size() + selectedMessagesCanStarIds[1].size() != 0 ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(delete, cantDeleteMessagesCount == 0 ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(tag_message, getUserConfig().isPremium() ? View.VISIBLE : View.GONE);
         actionMode.setItemVisibility(share, View.GONE);
+    }
+
+    private MessageObject getSingleSelectedMessageWithPreviousVersion() {
+        MessageObject selectedMessage = null;
+        for (int a = 0; a < selectedMessagesIds.length; a++) {
+            for (int b = 0; b < selectedMessagesIds[a].size(); b++) {
+                MessageObject candidate = selectedMessagesIds[a].valueAt(b);
+                if (candidate == null) {
+                    continue;
+                }
+                if (selectedMessage != null) {
+                    return null;
+                }
+                selectedMessage = candidate;
+            }
+        }
+        return selectedMessage != null && selectedMessage.hasPreviousMessageVersion() ? selectedMessage : null;
+    }
+
+    private void showPreviousMessageVersionDialog(MessageObject messageObject) {
+        if (getParentActivity() == null || messageObject == null || !messageObject.hasPreviousMessageVersion()) {
+            return;
+        }
+
+        final AlertDialog[] dialogHolder = new AlertDialog[1];
+        LinearLayout container = new LinearLayout(getParentActivity());
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(24), dp(24), dp(24), dp(12));
+
+        LinearLayout header = new LinearLayout(getParentActivity());
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView titleView = new TextView(getParentActivity());
+        titleView.setText(LocaleController.getString(R.string.MassgramPreviousEditTitle));
+        titleView.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        titleView.setTypeface(AndroidUtilities.bold());
+        titleView.setTextSize(20);
+        header.addView(titleView, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+
+        ImageView closeView = new ImageView(getParentActivity());
+        closeView.setImageResource(R.drawable.msg_close);
+        closeView.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_dialogTextBlack), PorterDuff.Mode.MULTIPLY));
+        closeView.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
+        closeView.setContentDescription(LocaleController.getString(R.string.Close));
+        header.addView(closeView, LayoutHelper.createLinear(36, 36));
+        container.addView(header, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView subtitleView = new TextView(getParentActivity());
+        subtitleView.setText(LocaleController.getString(R.string.MassgramPreviousEditInfo));
+        subtitleView.setTextColor(getThemedColor(Theme.key_dialogTextGray3));
+        subtitleView.setTextSize(14);
+        subtitleView.setPadding(0, dp(6), 0, dp(12));
+        container.addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        ScrollView scrollView = new ScrollView(getParentActivity());
+        scrollView.setVerticalScrollBarEnabled(false);
+
+        TextView bodyView = new TextView(getParentActivity());
+        String previousText = messageObject.getPreviousMessageText();
+        bodyView.setText(TextUtils.isEmpty(previousText) ? LocaleController.getString(R.string.MassgramPreviousEditEmpty) : previousText);
+        bodyView.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        bodyView.setTextSize(16);
+        bodyView.setTextIsSelectable(true);
+        bodyView.setLineSpacing(dp(2), 1f);
+        bodyView.setPadding(dp(16), dp(16), dp(16), dp(16));
+        bodyView.setBackground(Theme.createRoundRectDrawable(dp(16), getThemedColor(Theme.key_windowBackgroundGray)));
+        scrollView.addView(bodyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        container.addView(scrollView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), themeDelegate);
+        builder.setView(container);
+        AlertDialog dialog = builder.create();
+        dialogHolder[0] = dialog;
+        closeView.setOnClickListener(v -> {
+            if (dialogHolder[0] != null) {
+                dialogHolder[0].dismiss();
+            }
+        });
+        showDialog(dialog);
     }
 
     private void hideTagSelector() {
@@ -18694,6 +18786,7 @@ public class ChatActivity extends BaseFragment implements
                 createActionMode();
                 ActionBarMenuItem saveItem = actionBar.createActionMode().getItem(save_to);
                 ActionBarMenuItem copyItem = actionBar.createActionMode().getItem(copy);
+                ActionBarMenuItem viewPreviousItem = actionBar.createActionMode().getItem(view_previous_edit);
                 ActionBarMenuItem starItem = actionBar.createActionMode().getItem(star);
                 ActionBarMenuItem editItem = actionBar.createActionMode().getItem(edit);
                 ActionBarMenuItem forwardItem = actionBar.createActionMode().getItem(forward);
@@ -18750,6 +18843,9 @@ public class ChatActivity extends BaseFragment implements
                     copyVisible = copyItem.getVisibility();
                     copyItem.setVisibility(!noforwards && selectedMessagesCanCopyIds[0].size() + selectedMessagesCanCopyIds[1].size() != 0 ? View.VISIBLE : View.GONE);
                     newCopyVisible = copyItem.getVisibility();
+                }
+                if (viewPreviousItem != null) {
+                    viewPreviousItem.setVisibility(getSingleSelectedMessageWithPreviousVersion() != null ? View.VISIBLE : View.GONE);
                 }
                 if (starItem != null) {
                     starVisible = starItem.getVisibility();
@@ -18901,6 +18997,7 @@ public class ChatActivity extends BaseFragment implements
                         (forwardItem != null && forwardItem.getVisibility() == View.VISIBLE ? 1 : 0) +
                         (saveItem != null && saveItem.getVisibility() == View.VISIBLE ? 1 : 0) +
                         (copyItem != null && copyItem.getVisibility() == View.VISIBLE ? 1 : 0) +
+                        (viewPreviousItem != null && viewPreviousItem.getVisibility() == View.VISIBLE ? 1 : 0) +
                         (deleteItem != null && deleteItem.getVisibility() == View.VISIBLE ? 1 : 0) +
                         (starItem != null && starItem.getVisibility() == View.VISIBLE ? 1 : 0) +
                         (shareItem != null && shareItem.getVisibility() == View.VISIBLE ? 1 : 0)
@@ -19007,6 +19104,71 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    private CharSequence applyGhostModeTitleIndicator(CharSequence title) {
+        if (TextUtils.isEmpty(title)) {
+            return title;
+        }
+        String titleString = title.toString();
+        if (titleString.endsWith(" \uD83D\uDC7B")) {
+            titleString = titleString.substring(0, titleString.length() - 3);
+        }
+        if (!GhostModeManager.getInstance().isGhostModeEnabled()) {
+            return titleString;
+        }
+        return titleString + " \uD83D\uDC7B";
+    }
+
+    private void refreshGhostModeTitleIndicator() {
+        if (avatarContainer == null || avatarContainer.getTitleTextView() == null) {
+            return;
+        }
+        avatarContainer.getTitleTextView().setText(applyGhostModeTitleIndicator(avatarContainer.getTitleTextView().getText()), true);
+    }
+
+    private void markMessagesDeletedBySender(ArrayList<Integer> messageIds) {
+        if (messageIds == null || messageIds.isEmpty()) {
+            return;
+        }
+        HashSet<Integer> targetIds = new HashSet<>(messageIds);
+        boolean changed = false;
+        boolean updateReplyHeader = false;
+        for (int i = 0; i < messageIds.size(); i++) {
+            MessageObject messageObject = messagesDict[0].get(messageIds.get(i));
+            if (messageObject == null) {
+                continue;
+            }
+            messageObject.isDeletedBySender = true;
+            messageObject.forceUpdate = true;
+            if (messageObject.messageOwner != null) {
+                messageObject.messageOwner.isDeletedBySender = true;
+            }
+            changed = true;
+        }
+        if (replyingMessageObject != null && messageIds.contains(replyingMessageObject.getId())) {
+            replyingMessageObject.isDeletedBySender = true;
+            replyingMessageObject.forceUpdate = true;
+            if (replyingMessageObject.messageOwner != null) {
+                replyingMessageObject.messageOwner.isDeletedBySender = true;
+            }
+            changed = true;
+            updateReplyHeader = true;
+        }
+        if (threadMessageObject != null && messageIds.contains(threadMessageObject.getId())) {
+            threadMessageObject.isDeletedBySender = true;
+            threadMessageObject.forceUpdate = true;
+            if (threadMessageObject.messageOwner != null) {
+                threadMessageObject.messageOwner.isDeletedBySender = true;
+            }
+            changed = true;
+        }
+        if (changed) {
+            updateVisibleRows(msg -> msg != null && targetIds.contains(msg.getId()));
+            if (updateReplyHeader) {
+                updateReplyMessageHeader(true);
+            }
+        }
+    }
+
     public void updateTitle(boolean animated) {
         if (avatarContainer == null) {
             return;
@@ -19109,6 +19271,7 @@ public class ChatActivity extends BaseFragment implements
                 avatarContainer.setTitle(AndroidUtilities.removeRTL(AndroidUtilities.removeDiacritics(UserObject.getUserName(currentUser))), currentUser.scam, currentUser.fake, currentUser.verified, getMessagesController().isPremiumUser(currentUser), !MessagesController.isSupportUser(currentUser) ? currentUser.emoji_status : null, animated);
             }
         }
+        refreshGhostModeTitleIndicator();
         setParentActivityTitle(avatarContainer.getTitleTextView().getText());
         updateTitleIcons();
     }
@@ -21639,6 +21802,15 @@ public class ChatActivity extends BaseFragment implements
                     removeSelfFromStack();
                 }
             }
+        } else if (id == NotificationCenter.massgramMessagesMarkedDeleted) {
+            long dialogId = (long) args[0];
+            if (dialogId != 0 && dialogId != this.dialog_id) {
+                return;
+            }
+            markMessagesDeletedBySender((ArrayList<Integer>) args[1]);
+        } else if (id == NotificationCenter.massgramSettingsChanged) {
+            updateTitle(true);
+            updateVisibleRows();
         } else if (id == NotificationCenter.quickRepliesDeleted) {
             if (chatMode != MODE_QUICK_REPLIES) return;
             if ((Long) args[1] != getQuickReplyId()) return;

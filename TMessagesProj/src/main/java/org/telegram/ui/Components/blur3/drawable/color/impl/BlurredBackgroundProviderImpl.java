@@ -19,15 +19,15 @@ public class BlurredBackgroundProviderImpl {
     public static BlurredBackgroundProvider mainTabs(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
             .setBackgroundColor((r, isDark) -> {
-                final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f;
+                final float alpha = resolveGlassAlpha(isDark);
                 final int colorBg = Theme.getColor(Theme.key_windowBackgroundWhite, r);
-                final int colorTarget = Theme.getColor(Theme.key_glass_targetMainTabs, r);
+                final int colorTarget = resolveGlassTargetColor(r, isDark, Theme.key_glass_targetMainTabs, 0.15f);
                 return solveSrcColor(colorBg, colorTarget, alpha);
             })
-            .setStrokeColorTop(0x11000000, 0x06FFFFFF)
-            .setStrokeColorBottom(0x20000000, 0x11FFFFFF)
-            .setShadowColor(0x20000000, 0x04FFFFFF)
-            .setShadowLayer(dpf2(2.667f), 0, dpf2(0.85f))
+            .setStrokeColorTop(0x14000000, 0x1FFFFFFF)
+            .setStrokeColorBottom(0x22000000, 0x14FFFFFF)
+            .setShadowColor(0x18000000, 0x08000000)
+            .setShadowLayer(dpf2(4f), 0, dpf2(1f))
             .setStrokeWidth(dpf2(0.4f), dpf2(0.4f))
             .build();
     }
@@ -35,15 +35,15 @@ public class BlurredBackgroundProviderImpl {
     public static BlurredBackgroundProvider topPanel(Theme.ResourcesProvider resourcesProvider) {
         return new BlurredBackgroundProviderBuilder(resourcesProvider)
             .setBackgroundColor((r, isDark) -> {
-                final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f;
+                final float alpha = resolveGlassAlpha(isDark);
                 final int colorBg = Theme.getColor(Theme.key_windowBackgroundWhite, r);
-                final int colorTarget = Theme.getColor(Theme.key_glass_targetMainTopPanel, r);
+                final int colorTarget = resolveGlassTargetColor(r, isDark, Theme.key_glass_targetMainTopPanel, 0.10f);
                 return solveSrcColor(colorBg, colorTarget, alpha);
             })
-            .setStrokeColorTop(0x17000000, 0x17FFFFFF)
-            .setStrokeColorBottom(0x17000000, 0x17FFFFFF)
-            .setShadowColor(0x26000000, 0x04FFFFFF)
-            .setShadowLayer(dpf2(10 / 3f), 0, dpf2(2 / 3f))
+            .setStrokeColorTop(0x12000000, 0x26FFFFFF)
+            .setStrokeColorBottom(0x18000000, 0x14FFFFFF)
+            .setShadowColor(0x18000000, 0x06000000)
+            .setShadowLayer(dpf2(4f), 0, dpf2(1f))
             .setStrokeWidth(dpf2(0.4f), dpf2(0.4f))
             .build();
     }
@@ -81,13 +81,14 @@ public class BlurredBackgroundProviderImpl {
                             Theme.key_actionBarDefault : Theme.key_chat_topPanelBackground, r), 255);
                     }
 
-                    final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f;
+                    final float alpha = resolveGlassAlpha(isDark);
                     final int colorBg = Theme.getColor(Theme.key_chat_topPanelBackground, r);
-                    return Theme.multAlpha(colorBg, alpha);
+                    final int colorTarget = resolveGlassTargetColor(r, isDark, Theme.key_chat_topPanelBackground, 0.08f);
+                    return solveSrcColor(colorBg, colorTarget, alpha);
                 })
-                .setStrokeColorTop(0xFFFFFFFF, 0x28FFFFFF)
-                .setStrokeColorBottom(0xFFFFFFFF, 0x14FFFFFF)
-                .setShadowColor(0x20000000, 0)
+                .setStrokeColorTop(0xCCFFFFFF, 0x30FFFFFF)
+                .setStrokeColorBottom(0x66FFFFFF, 0x12FFFFFF)
+                .setShadowColor(0x18000000, 0)
                 //.setShadowLayer(dpf2(10 / 3f), 0, dpf2(2 / 3f))
                 .setStrokeWidth(dpf2(0.5f), dpf2(0.5f))
                 .build();
@@ -167,6 +168,19 @@ public class BlurredBackgroundProviderImpl {
         final int a8 = MathUtils.clamp(Math.round(alpha * 255f), 0, 255);
 
         return Color.argb(a8, srcR, srcG, srcB);
+    }
+
+    private static float resolveGlassAlpha(boolean isDark) {
+        if (LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) {
+            return isDark ? 0.64f : 0.72f;
+        }
+        return isDark ? 0.74f : 0.80f;
+    }
+
+    private static int resolveGlassTargetColor(Theme.ResourcesProvider resourcesProvider, boolean isDark, int fallbackKey, float accentMix) {
+        final int colorTarget = Theme.getColor(fallbackKey, resourcesProvider);
+        final int accent = Theme.getColor(Theme.key_telegram_color, resourcesProvider);
+        return ColorUtils.blendARGB(colorTarget, accent, isDark ? Math.min(accentMix + 0.04f, 0.25f) : accentMix);
     }
 
     public static boolean checkBlurEnabled(Theme.ResourcesProvider resourcesProvider) {

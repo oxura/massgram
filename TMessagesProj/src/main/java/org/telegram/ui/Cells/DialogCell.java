@@ -20,7 +20,9 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.BlurMaskFilter;
 import android.graphics.LinearGradient;
+import android.graphics.MaskFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -73,6 +75,7 @@ import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramChatLockManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
@@ -1027,6 +1030,30 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         return drawPin || drawPinForced;
     }
 
+    private boolean shouldDrawLockedPreview() {
+        return currentDialogFolderId == 0
+                && currentDialogId != 0
+                && !isDialogFolder()
+                && !isSavedDialog
+                && MassgramChatLockManager.getInstance().isChatLocked(currentDialogId);
+    }
+
+    private BlurMaskFilter lockedPreviewBlurMaskFilter;
+
+    private BlurMaskFilter getLockedPreviewBlurMaskFilter() {
+        if (lockedPreviewBlurMaskFilter == null) {
+            lockedPreviewBlurMaskFilter = new BlurMaskFilter(dp(3), BlurMaskFilter.Blur.NORMAL);
+        }
+        return lockedPreviewBlurMaskFilter;
+    }
+
+    private void updateLockedPreviewLayerType() {
+        int requiredLayerType = shouldDrawLockedPreview() ? View.LAYER_TYPE_SOFTWARE : View.LAYER_TYPE_NONE;
+        if (getLayerType() != requiredLayerType) {
+            setLayerType(requiredLayerType, null);
+        }
+    }
+
     public void setPinForced(boolean value) {
         drawPinForced = value;
         if (getMeasuredWidth() > 0 && getMeasuredHeight() > 0) {
@@ -1978,6 +2005,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     if (clearingDialog) {
                         drawCount = false;
                         showChecks = false;
+                    } else if (shouldDrawLockedPreview()) {
+                        drawCount = true;
+                        countString = unreadCount > 0 ? String.format("%d", unreadCount) : "";
+                        drawMention = false;
+                        drawReactionMention = false;
                     } else if (unreadCount != 0 && (unreadCount != 1 || unreadCount != mentionCount || message == null || !message.messageOwner.mentioned)) {
                         drawCount = true;
                         countString = String.format("%d", unreadCount);
@@ -1987,13 +2019,17 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     } else {
                         drawCount = false;
                     }
-                    if (mentionCount != 0) {
+                    if (shouldDrawLockedPreview()) {
+                        drawMention = false;
+                    } else if (mentionCount != 0) {
                         drawMention = true;
                         mentionString = "@";
                     } else {
                         drawMention = false;
                     }
-                    if (reactionMentionCount > 0) {
+                    if (shouldDrawLockedPreview()) {
+                        drawReactionMention = false;
+                    } else if (reactionMentionCount > 0) {
                         drawReactionMention = true;
                     } else {
                         drawReactionMention = false;
@@ -2362,8 +2398,13 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         } else if (countString != null || mentionString != null || drawReactionMention) {
             if (countString != null) {
-                countWidth = Math.max(dp(BADGE_TEXT_MIN_WIDTH), (int) Math.ceil(Theme.dialogs_countTextPaint2.measureText(countString)));
-                countLayout = new StaticLayout(countString, Theme.dialogs_countTextPaint2, countWidth, Layout.Alignment.ALIGN_CENTER, 1.0f, 0.0f, false);
+                if (shouldDrawLockedPreview()) {
+                    countWidth = dp(24);
+                    countLayout = null;
+                } else {
+                    countWidth = Math.max(dp(BADGE_TEXT_MIN_WIDTH), (int) Math.ceil(Theme.dialogs_countTextPaint2.measureText(countString)));
+                    countLayout = new StaticLayout(countString, Theme.dialogs_countTextPaint2, countWidth, Layout.Alignment.ALIGN_CENTER, 1.0f, 0.0f, false);
+                }
                 int w = countWidth + dp(BADGE_GAP);
                 messageWidth -= w;
                 if (!LocaleController.isRTL) {
@@ -2759,6 +2800,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
         updateThumbsPosition();
+        updateLockedPreviewLayerType();
     }
 
     public void setTitleOverride(String s) {
@@ -3941,6 +3983,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
 
             if (messageNameLayout != null && !isForumCell()) {
+                final int oldMessageNameAlpha = Theme.dialogs_messageNamePaint.getAlpha();
                 if (currentDialogFolderId != 0) {
                     Theme.dialogs_messageNamePaint.setColor(Theme.dialogs_messageNamePaint.linkColor = Theme.getColor(Theme.key_chats_nameMessageArchived_threeLines, resourcesProvider));
                 } else if (draftMessage != null) {
@@ -3957,9 +4000,15 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     FileLog.e(e);
                 }
                 canvas.restore();
+                Theme.dialogs_messageNamePaint.setAlpha(oldMessageNameAlpha);
             }
 
             if (messageLayout != null) {
+                final int oldMessageAlpha = messageLayout.getPaint().getAlpha();
+                final boolean lockedPreview = shouldDrawLockedPreview();
+                if (shouldDrawLockedPreview()) {
+                    messageLayout.getPaint().setAlpha((int) (oldMessageAlpha * 0.58f));
+                }
                 if (currentDialogFolderId != 0) {
                     if (chat != null) {
                         Theme.dialogs_messagePaint[paintIndex].setColor(Theme.dialogs_messagePaint[paintIndex].linkColor = Theme.getColor(Theme.key_chats_nameMessageArchived, resourcesProvider));
@@ -3984,6 +4033,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     canvas.translate(messageLeft, top);
                     int oldAlpha = messageLayout.getPaint().getAlpha();
                     messageLayout.getPaint().setAlpha((int) (oldAlpha * (1f - updateHelper.typingProgres)));
+                    MaskFilter oldMaskFilter = messageLayout.getPaint().getMaskFilter();
+                    if (lockedPreview) {
+                        messageLayout.getPaint().setMaskFilter(getLockedPreviewBlurMaskFilter());
+                    }
                     if (!spoilers.isEmpty()) {
                         try {
                             canvas.save();
@@ -4003,6 +4056,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     } else {
                         SpoilerEffect.layoutDrawMaybe(messageLayout, canvas);
                         AnimatedEmojiSpan.drawAnimatedEmojis(canvas, messageLayout, animatedEmojiStack, -.075f, null, 0, 0, 0, 1f, getAdaptiveEmojiColorFilter(2, messageLayout.getPaint().getColor()));
+                    }
+                    if (lockedPreview) {
+                        messageLayout.getPaint().setMaskFilter(oldMaskFilter);
                     }
                     messageLayout.getPaint().setAlpha(oldAlpha);
                     canvas.restore();
@@ -4025,6 +4081,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     typingLayout.getPaint().setAlpha(oldAlpha);
                 }
                 canvas.restore();
+                messageLayout.getPaint().setAlpha(oldMessageAlpha);
 
                 if (typingLayout != null && (printingStringType >= 0 || (updateHelper.typingProgres > 0 && updateHelper.lastKnownTypingType >= 0))) {
                     int type = printingStringType >= 0 ? printingStringType : updateHelper.lastKnownTypingType;
@@ -4927,6 +4984,62 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     }
 
     private void drawCounter(Canvas canvas, boolean drawCounterMuted, int countTop, int countLeftLocal, int countLeftOld, float globalScale, boolean outline) {
+        if (shouldDrawLockedPreview()) {
+            Paint backgroundPaint = drawCounterMuted || currentDialogFolderId != 0 ? Theme.dialogs_countGrayPaint : Theme.dialogs_countPaint;
+            int oldBackgroundAlpha = backgroundPaint.getAlpha();
+            RectF lockRect = AndroidUtilities.rectTmp;
+            lockRect.set(countLeftLocal, countTop, countLeftLocal + dp(24), countTop + dp(24));
+            int restoreCount = canvas.save();
+            if (globalScale != 1f) {
+                canvas.scale(globalScale, globalScale, lockRect.centerX(), lockRect.centerY());
+            }
+            backgroundPaint.setAlpha((int) ((1.0f - reorderIconProgress) * 255));
+            canvas.drawRoundRect(lockRect, dp(12), dp(12), backgroundPaint);
+
+            Drawable lockDrawable = Theme.dialogs_lock2Drawable;
+            if (lockDrawable != null) {
+                int lockWidth = Math.max(dp(10), lockDrawable.getIntrinsicWidth());
+                int lockHeight = Math.max(dp(12), lockDrawable.getIntrinsicHeight());
+                int left = (int) (lockRect.centerX() - lockWidth / 2f);
+                int top = (int) (lockRect.centerY() - lockHeight / 2f);
+                lockDrawable.setBounds(left, top, left + lockWidth, top + lockHeight);
+                lockDrawable.setAlpha((int) ((1.0f - reorderIconProgress) * 255));
+                lockDrawable.draw(canvas);
+                lockDrawable.setAlpha(255);
+            }
+
+            if (unreadCount > 0 || markUnread) {
+                TextPaint badgeTextPaint = Theme.dialogs_countTextPaint2;
+                float oldTextSize = badgeTextPaint.getTextSize();
+                int oldTextAlpha = badgeTextPaint.getAlpha();
+                badgeTextPaint.setTextSize(dp(10));
+
+                String badgeText = unreadCount > 0 ? String.valueOf(unreadCount) : "";
+                float badgeWidth = TextUtils.isEmpty(badgeText) ? dp(10) : Math.max(dp(14), badgeTextPaint.measureText(badgeText) + dp(7));
+                RectF badgeRect = new RectF(
+                    lockRect.right - badgeWidth * 0.65f,
+                    lockRect.top - dp(4),
+                    lockRect.right - badgeWidth * 0.65f + badgeWidth,
+                    lockRect.top - dp(4) + dp(16)
+                );
+                Paint badgePaint = drawCounterMuted ? Theme.dialogs_countGrayPaint : Theme.dialogs_countPaint;
+                canvas.drawRoundRect(badgeRect, dp(8), dp(8), badgePaint);
+                if (!TextUtils.isEmpty(badgeText)) {
+                    canvas.drawText(
+                        badgeText,
+                        badgeRect.left + (badgeRect.width() - badgeTextPaint.measureText(badgeText)) / 2f,
+                        badgeRect.top + dp(11.2f),
+                        badgeTextPaint
+                    );
+                }
+
+                badgeTextPaint.setTextSize(oldTextSize);
+                badgeTextPaint.setAlpha(oldTextAlpha);
+            }
+            backgroundPaint.setAlpha(oldBackgroundAlpha);
+            canvas.restoreToCount(restoreCount);
+            return;
+        }
         final boolean drawBubble = isForumCell() || isFolderCell();
         if (drawCount && drawCount2 || countChangeProgress != 1f) {
             final float progressFinal = (unreadCount == 0 && !markUnread) ? 1f - countChangeProgress : countChangeProgress;

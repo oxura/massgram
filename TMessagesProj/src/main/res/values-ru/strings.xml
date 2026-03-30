@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="AppName">Telegram</string>
     <string name="AppNameBeta">Telegram Beta</string>
@@ -263,4 +263,55 @@
     <string name="RemindTodayAt">\'Отправить сегодня в\' HH:mm</string>
     <string name="RemindDayAt">\'Отправить\' d MMM \'в\' HH:mm</string>
     <string name="RemindDayYearAt">\'Напомнить\' d MMM yyyy \'в\' HH:mm</string>
+    <string name="MassgramSettings">Настройки Massgram</string>
+    <string name="MassgramSettingsInfo">Настройка визуала Massgram и дополнительных функций интерфейса.</string>
+    <string name="MassgramSettingsAppearance">Оформление</string>
+    <string name="MassgramSettingsPrivacy">Конфиденциальность</string>
+    <string name="MassgramSettingsSupport">Поддержка</string>
+    <string name="MassgramSettingsUpdates">Обновления</string>
+    <string name="MassgramLiquidGlass">Liquid glass</string>
+    <string name="MassgramLiquidGlassInfo">Включает стеклянные полупрозрачные поверхности и blur-интерфейс Massgram на поддерживаемых устройствах. Интерфейс обновляется сразу после переключения.</string>
+    <string name="MassgramLiquidGlassUnsupported">Liquid glass требует Android 13+ и как минимум среднего класса производительности на этом устройстве.</string>
+    <string name="MassgramGhostMode">Режим призрака</string>
+    <string name="MassgramGhostModeInfo">Блокирует статусы online, last seen, typing и подтверждения прочтения, сохраняя входящие сообщения и обновления в реальном времени.</string>
+    <string name="MassgramSaveDeletedMessages">Сохранять удалённые сообщения</string>
+    <string name="MassgramSaveDeletedMessagesInfo">Оставляет удалённые у собеседника сообщения в локальной истории и помечает их визуально вместо удаления из чата.</string>
+    <string name="MassgramRelayOnlyCalls">Звонки только через relay</string>
+    <string name="MassgramRelayOnlyCallsInfo">Отключает прямые peer-to-peer звонки и принудительно отправляет новые вызовы через relay Telegram, чтобы уменьшить раскрытие IP другому участнику.</string>
+    <string name="MassgramDisableLinkPreviews">Отключить предпросмотр ссылок</string>
+    <string name="MassgramDisableLinkPreviewsInfo">Всегда отправляет ссылки без webpage preview, чтобы Massgram не запрашивал генерацию превью для новых сообщений и правок.</string>
+    <string name="MassgramCheckUpdates">Проверить обновления</string>
+    <string name="MassgramCurrentVersion">Текущая версия: %1$s</string>
+    <string name="MassgramUpdateSourceNotConfigured">Источник обновлений Massgram ещё не настроен.</string>
+    <string name="MassgramUpdateCheckFailed">Massgram не смог проверить обновления сейчас.</string>
+    <string name="MassgramUpdateDownloadFailed">Massgram не смог скачать пакет обновления.</string>
+    <string name="MassgramUpdateInvalidManifest">Скачанный пакет не прошёл проверку целостности.</string>
+    <string name="MassgramUpdateDownloaded">Пакет обновления готов к установке.</string>
+    <string name="MassgramDeveloperTitle">Разработчик</string>
+    <string name="MassgramDeveloperHandle">@awenqo</string>
+    <string name="MassgramDeveloperInfo">По вопросам о Massgram, партнёрству, фидбеку по текущему функционалу или предложениям новых функций можно написать разработчику в Telegram.</string>
+    <string name="MassgramContributorTitle">Тестирование и разработка</string>
+    <string name="MassgramContributorHandle">@kakadkl</string>
+    <string name="MassgramContributorInfo">Помогал с тестированием мода и доработкой части процесса разработки.</string>
+    <string name="MassgramLockChat">Закрыть чат</string>
+    <string name="MassgramUnlockChat">Открыть чат</string>
+    <string name="MassgramCreateChatPinTitle">Создать PIN для чата</string>
+    <string name="MassgramCreateChatPinInfo">Задайте 4-значный PIN для этого чата. Massgram будет запрашивать его перед открытием чата из списка.</string>
+    <string name="MassgramConfirmChatPinTitle">Подтвердите PIN</string>
+    <string name="MassgramConfirmChatPinInfo">Повторно введите тот же 4-значный PIN, чтобы сохранить блокировку.</string>
+    <string name="MassgramChatPinHintTitle">Добавить подсказку</string>
+    <string name="MassgramChatPinHintInfo">Добавьте короткую подсказку, которая поможет вспомнить PIN, но не раскроет его напрямую.</string>
+    <string name="MassgramChatPinHintPlaceholder">Подсказка</string>
+    <string name="MassgramChatPinHintValue">Подсказка: %1$s</string>
+    <string name="MassgramChatPinShowHint">Подсказка</string>
+    <string name="MassgramChatPinSavedHintTitle">Сохранённая подсказка</string>
+    <string name="MassgramChatPinPlaceholder">4-значный PIN</string>
+    <string name="MassgramChatPinInvalidLength">Введите ровно 4 цифры.</string>
+    <string name="MassgramChatPinMismatchTitle">PIN-коды не совпадают</string>
+    <string name="MassgramChatPinMismatchText">Подтверждение отличается от первого PIN. Попробуйте ещё раз.</string>
+    <string name="MassgramInvalidChatPinTitle">Неверный PIN</string>
+    <string name="MassgramInvalidChatPinText">Этот PIN не подходит для выбранного чата.</string>
+    <string name="MassgramUnlockChatInfo">Введите 4-значный PIN, чтобы открыть этот чат.</string>
+    <string name="MassgramRemoveChatLockInfo">Введите текущий 4-значный PIN, чтобы снять блокировку с этого чата.</string>
+    <string name="MassgramSkip">Пропустить</string>
 </resources>

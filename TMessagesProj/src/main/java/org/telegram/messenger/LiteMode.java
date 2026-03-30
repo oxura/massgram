@@ -63,12 +63,13 @@ public class LiteMode {
         FLAG_ANIMATED_EMOJI_REACTIONS_PREMIUM |
         FLAG_ANIMATED_EMOJI_CHAT |
         FLAG_CHAT_FORUM_TWOCOLUMN |
+        FLAG_LIQUID_GLASS |
         FLAG_CALLS_ANIMATIONS |
         FLAG_AUTOPLAY_VIDEOS |
         FLAG_AUTOPLAY_GIFS |
         FLAG_CHAT_THANOS |
         FLAG_PARTICLES
-    ); // 204383
+    ); // 466527
     public static int PRESET_HIGH = (
         FLAGS_ANIMATED_STICKERS |
         FLAGS_ANIMATED_EMOJI |
@@ -78,11 +79,12 @@ public class LiteMode {
         FLAG_CHAT_BLUR |
         FLAG_CHAT_SCALE |
         FLAG_CHAT_THANOS |
+        FLAG_LIQUID_GLASS |
         FLAG_CALLS_ANIMATIONS |
         FLAG_AUTOPLAY_VIDEOS |
         FLAG_AUTOPLAY_GIFS |
         FLAG_PARTICLES
-    ); // 262143
+    ); // 524287
     public static int PRESET_POWER_SAVER = 0;
 
     private static int BATTERY_LOW = 10;
@@ -210,7 +212,8 @@ public class LiteMode {
         }
 
         final SharedPreferences preferences = MessagesController.getGlobalMainSettings();
-        if (!preferences.contains("lite_mode6")) {
+        final boolean hadLiteMode6 = preferences.contains("lite_mode6");
+        if (!hadLiteMode6) {
             if (preferences.contains("lite_mode5")) {
                 defaultValue = preferences.getInt("lite_mode5", defaultValue);
                 defaultValue &=~ FLAG_LIQUID_GLASS;
@@ -278,11 +281,23 @@ public class LiteMode {
 
         int prevValue = value;
         value = preferences.getInt("lite_mode6", defaultValue);
+        if (!hadLiteMode6) {
+            if (supportsLiquidGlass()) {
+                value |= FLAG_LIQUID_GLASS;
+            } else {
+                value &= ~FLAG_LIQUID_GLASS;
+            }
+            preferences.edit().putInt("lite_mode6", value).apply();
+        }
         if (loaded) {
             onFlagsUpdate(prevValue, value);
         }
         powerSaverLevel = preferences.getInt("lite_mode_battery_level", batteryDefaultValue);
         loaded = true;
+    }
+
+    public static boolean supportsLiquidGlass() {
+        return Build.VERSION.SDK_INT >= 33 && SharedConfig.getDevicePerformanceClass() >= SharedConfig.PERFORMANCE_CLASS_AVERAGE;
     }
 
     public static void savePreference() {

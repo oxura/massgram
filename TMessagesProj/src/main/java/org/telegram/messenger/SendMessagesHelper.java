@@ -3177,9 +3177,17 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
     }
 
+    private boolean shouldDisableLocalLinkPreviews() {
+        return GhostModeManager.getInstance().shouldDisableLocalLinkPreviews();
+    }
+
     public int editMessage(MessageObject messageObject, String message, boolean searchLinks, final BaseFragment fragment, ArrayList<TLRPC.MessageEntity> entities, int scheduleDate, int scheduleRepeatPeriod) {
         if (fragment == null || fragment.getParentActivity() == null) {
             return 0;
+        }
+        if (shouldDisableLocalLinkPreviews()) {
+            // Privacy mode always edits messages without webpage previews.
+            searchLinks = false;
         }
 
         final TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
@@ -3843,6 +3851,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         TLRPC.WebPage webPage = sendMessageParams.webPage;
         TLRPC.TL_messageMediaWebPage mediaWebPage = sendMessageParams.mediaWebPage;
         boolean searchLinks = sendMessageParams.searchLinks;
+        if (shouldDisableLocalLinkPreviews()) {
+            // Clear any prepared preview so the outgoing request stays consistent with the toggle.
+            searchLinks = false;
+            webPage = null;
+            mediaWebPage = null;
+        }
         MessageObject retryMessageObject = sendMessageParams.retryMessageObject;
         ArrayList<TLRPC.MessageEntity> entities = sendMessageParams.entities;
         TLRPC.ReplyMarkup replyMarkup = sendMessageParams.replyMarkup;

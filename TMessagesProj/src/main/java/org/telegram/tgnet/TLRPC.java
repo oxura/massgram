@@ -62442,6 +62442,8 @@ public class TLRPC {
         public TL_textWithEntities summaryText; //custom
         public String translatedSummaryLanguage; //custom
         public TL_textWithEntities translatedSummaryText; //custom
+        public boolean isDeletedBySender; //custom
+        public String previousMessageText; //custom
 
         public static Message TLdeserialize(InputSerializedData stream, int constructor, boolean exception) {
             Message result = null;

@@ -64,6 +64,7 @@ import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.AuthTokensHelper;
+import org.telegram.messenger.BetaUpdate;
 import org.telegram.messenger.BirthdayController;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChatThemeController;
@@ -680,6 +681,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(SettingCell.Factory.of(1, 0xFF1CA5ED, 0xFF1488E1, R.drawable.settings_account, getString(R.string.SettingsAccount), getString(R.string.SettingsAccountInfo)));
         items.add(SettingCell.Factory.of(2, 0xFFF09F1B, 0xFFE18A11, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
+        items.add(SettingCell.Factory.of(24, 0xFF8AB5FF, 0xFF74E2D4, R.drawable.settings_features, getString(R.string.MassgramSettings), getString(R.string.MassgramSettingsInfo)));
         items.add(SettingCell.Factory.of(3, 0xFF55CA47, 0xFF27B434, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
         items.add(SettingCell.Factory.of(5, 0xFFF45255, 0xFFDF3955, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
         items.add(SettingCell.Factory.of(6, 0xFF4F85F6, 0xFF3568E8, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
@@ -739,6 +741,18 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(SettingCell.Factory.of(20, 0xFF55CA47, 0xFF27B434, 0, getString(R.string.DebugSendLogs)));
             items.add(SettingCell.Factory.of(21, 0xFF55CA47, 0xFF27B434, 0, getString(R.string.DebugSendLastLogs)));
             items.add(SettingCell.Factory.of(22, 0xFFF45255, 0xFFDF3955, 0, getString(R.string.DebugClearLogs)));
+        }
+
+        if (ApplicationLoader.isStandaloneBuild() || ApplicationLoader.isBetaBuild()) {
+            items.add(UItem.asShadow(null));
+            items.add(SettingCell.Factory.of(
+                25,
+                0xFF4F85F6,
+                0xFF3568E8,
+                R.drawable.msg_download_settings,
+                getString(R.string.MassgramCheckUpdates),
+                LocaleController.formatString("MassgramCurrentVersion", R.string.MassgramCurrentVersion, BuildVars.BUILD_VERSION_STRING)
+            ));
         }
 
         items.add(UItem.asCustomShadow(versionView));
@@ -808,6 +822,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             case 9:
                 presentFragment(new LiteModeSettingsActivity());
                 break;
+            case 24:
+                presentFragment(new MassgramSettingsActivity());
+                break;
             case 10:
                 presentFragment(new LanguageSelectActivity());
                 break;
@@ -855,7 +872,42 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 }
                 break;
             }
+            case 25:
+                checkMassgramUpdateManually();
+                break;
         }
+    }
+
+    private void checkMassgramUpdateManually() {
+        Activity activity = getParentActivity();
+        if (activity == null) {
+            return;
+        }
+        if (!ApplicationLoader.applicationLoaderInstance.hasCustomUpdateConfig()) {
+            showDialog(AlertsCreator.createSimpleAlert(
+                activity,
+                LocaleController.getString(R.string.AppUpdate),
+                LocaleController.getString(R.string.MassgramUpdateSourceNotConfigured)
+            ).create());
+            return;
+        }
+        ApplicationLoader.applicationLoaderInstance.checkUpdate(true, () -> {
+            Activity parentActivity = getParentActivity();
+            if (parentActivity == null) {
+                return;
+            }
+            String error = ApplicationLoader.applicationLoaderInstance.getLastUpdateError();
+            if (!TextUtils.isEmpty(error)) {
+                BulletinFactory.of(this).createErrorBulletin(error).show();
+                return;
+            }
+            BetaUpdate update = ApplicationLoader.applicationLoaderInstance.getUpdate();
+            if (update != null) {
+                ApplicationLoader.applicationLoaderInstance.showCustomUpdateAppPopup(parentActivity, update, currentAccount);
+            } else {
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.YourVersionIsLatest)).show();
+            }
+        });
     }
 
     private boolean onLongClick(UItem item, View view, int position, float x, float y) {

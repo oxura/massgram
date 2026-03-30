@@ -57,6 +57,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     private BackupImageView backupImageView;
     private Theme.ResourcesProvider resourcesProvider;
     private final Paint paintCounterBackground = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paintSelectionStroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final AnimatedTextView.AnimatedTextDrawable counter;
 
     private static final int ANIMATOR_ID_IS_SELECTED = 0;
@@ -100,6 +101,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         counter.setGravity(Gravity.CENTER);
         counter.setTextColor(Color.WHITE);
         counter.setTextSize(dp(10));
+        paintSelectionStroke.setStyle(Paint.Style.STROKE);
     }
 
     private boolean hasVisualWidth;
@@ -144,14 +146,21 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         final float selectedFactor = hasGestureSelectedOverride ? gestureSelectedOverride : isSelectedAnimator.getFloatValue();
         if (selectedFactor > 0) {
             final float alpha = AnimatorUtils.DECELERATE_INTERPOLATOR.getInterpolation(selectedFactor);
+            final boolean isDark = resourcesProvider != null ? resourcesProvider.isDark() : Theme.isCurrentThemeDark();
+            final int selectedFill = ColorUtils.blendARGB(colorSelected, isDark ? Color.WHITE : Color.BLACK, isDark ? 0.10f : 0.06f);
+            final int selectedStroke = ColorUtils.setAlphaComponent(isDark ? Color.WHITE : colorSelected, (int) (255 * 0.22f * alpha));
 
-            paintCounterBackground.setColor(Theme.multAlpha(colorSelected, 0.09f * alpha));
+            paintCounterBackground.setColor(Theme.multAlpha(selectedFill, 0.18f * alpha));
+            paintSelectionStroke.setColor(selectedStroke);
+            paintSelectionStroke.setStrokeWidth(dpf2(1f));
             tmpRectF.set(0, 0, viewWidth, getHeight());
             final float r = Math.min(tmpRectF.width(), tmpRectF.height()) / 2f;
             final float s = lerp(0.6f, 1, selectedFactor) * MathUtils.clamp(attachScale, 0, 1);
             canvas.save();
             canvas.scale(s, s, tmpRectF.centerX(), tmpRectF.centerY());
             canvas.drawRoundRect(tmpRectF, r, r, paintCounterBackground);
+            tmpRectF.inset(dpf2(0.5f), dpf2(0.5f));
+            canvas.drawRoundRect(tmpRectF, r, r, paintSelectionStroke);
             canvas.restore();
         }
 

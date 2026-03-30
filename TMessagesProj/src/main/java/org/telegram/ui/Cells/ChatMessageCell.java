@@ -17649,6 +17649,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         if (effectId != 0 && !currentMessageObject.notime) {
             timeWidth += dp(14 + 4);
         }
+        if (messageObject != null && (messageObject.isDeletedBySender || messageObject.messageOwner != null && messageObject.messageOwner.isDeletedBySender)) {
+            deletedMessageMarkerPaint.setTextSize(dp(11));
+            int deletedMarkerWidth = (int) Math.ceil(deletedMessageMarkerPaint.measureText(DELETED_MESSAGE_MARKER)) + dp(6);
+            timeWidth += deletedMarkerWidth;
+            timeTextWidth += deletedMarkerWidth;
+        }
         if (signString != null) {
             if (availableTimeWidth == 0) {
                 availableTimeWidth = dp(1000);
@@ -18965,6 +18971,76 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
     }
 
+    private static final String DELETED_MESSAGE_MARKER = "\uD83D\uDDD1";
+    private final TextPaint deletedMessageMarkerPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private ColorFilter deletedMessageColorFilter;
+
+    private boolean isDeletedBySender() {
+        return currentMessageObject != null && (currentMessageObject.isDeletedBySender || currentMessageObject.messageOwner != null && currentMessageObject.messageOwner.isDeletedBySender);
+    }
+
+    private ColorFilter getDeletedMessageColorFilter() {
+        if (deletedMessageColorFilter == null) {
+            ColorMatrix colorMatrix = new ColorMatrix(new float[] {
+                0.82f, 0f, 0f, 0f, 0f,
+                0f, 0.82f, 0f, 0f, 0f,
+                0f, 0f, 0.82f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
+            });
+            deletedMessageColorFilter = new ColorMatrixColorFilter(colorMatrix);
+        }
+        return deletedMessageColorFilter;
+    }
+
+    private Paint[] getDeletedMessageAffectedPaints() {
+        return new Paint[] {
+            Theme.chat_msgTextPaint,
+            Theme.chat_msgGameTextPaint,
+            Theme.chat_msgTextCodePaint,
+            Theme.chat_msgTextCode2Paint,
+            Theme.chat_msgTextCode3Paint,
+            Theme.chat_msgTextPaintOneEmoji,
+            Theme.chat_msgTextPaintTwoEmoji,
+            Theme.chat_msgTextPaintThreeEmoji,
+            Theme.chat_replyNamePaint,
+            Theme.chat_replyTextPaint,
+            Theme.chat_quoteTextPaint,
+            Theme.chat_timePaint
+        };
+    }
+
+    private ColorFilter[] applyDeletedMessagePaintFilters() {
+        Paint[] paints = getDeletedMessageAffectedPaints();
+        ColorFilter[] oldFilters = new ColorFilter[paints.length];
+        ColorFilter filter = getDeletedMessageColorFilter();
+        for (int i = 0; i < paints.length; i++) {
+            oldFilters[i] = paints[i].getColorFilter();
+            paints[i].setColorFilter(filter);
+        }
+        return oldFilters;
+    }
+
+    private void restoreDeletedMessagePaintFilters(ColorFilter[] oldFilters) {
+        if (oldFilters == null) {
+            return;
+        }
+        Paint[] paints = getDeletedMessageAffectedPaints();
+        for (int i = 0; i < paints.length && i < oldFilters.length; i++) {
+            paints[i].setColorFilter(oldFilters[i]);
+        }
+    }
+
+    private void drawDeletedMessageMarker(Canvas canvas, StaticLayout timeLayout) {
+        if (!isDeletedBySender() || timeLayout == null) {
+            return;
+        }
+        deletedMessageMarkerPaint.set(Theme.chat_timePaint);
+        deletedMessageMarkerPaint.setTextSize(dp(11));
+        float markerX = drawTimeX + timeLayout.getLineWidth(0) + dp(4);
+        float markerY = drawTimeY + timeLayout.getLineBaseline(0);
+        canvas.drawText(DELETED_MESSAGE_MARKER, markerX, markerY, deletedMessageMarkerPaint);
+    }
+
     protected boolean isWidthAdaptive() {
         return false;
     }
@@ -19066,21 +19142,22 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         setupTextColors();
+        ColorFilter[] deletedMessagePaintFilters = isDeletedBySender() ? applyDeletedMessagePaintFilters() : null;
+        try {
+            if (getStarsPriceTopPadding() + suggestionOfferTopPadding + getTopicSeparatorTopPadding() > 0) {
+                canvas.save();
+                canvas.translate(0, getStarsPriceTopPadding() + suggestionOfferTopPadding + getTopicSeparatorTopPadding());
+            }
 
-        if (getStarsPriceTopPadding() + suggestionOfferTopPadding + getTopicSeparatorTopPadding() > 0) {
-            canvas.save();
-            canvas.translate(0, getStarsPriceTopPadding() + suggestionOfferTopPadding + getTopicSeparatorTopPadding());
-        }
+            if (isWidthAdaptive()) {
+                canvas.save();
+                canvas.translate(-getBoundsLeft(), 0);
+            }
 
-        if (isWidthAdaptive()) {
-            canvas.save();
-            canvas.translate(-getBoundsLeft(), 0);
-        }
-
-        drawBackgroundInternal(canvas, false);
-        if (isHighlightedAnimated) {
-            long newTime = System.currentTimeMillis();
-            long dt = Math.abs(newTime - lastHighlightProgressTime);
+            drawBackgroundInternal(canvas, false);
+            if (isHighlightedAnimated) {
+                long newTime = System.currentTimeMillis();
+                long dt = Math.abs(newTime - lastHighlightProgressTime);
             if (dt > 17) {
                 dt = 17;
             }
@@ -19261,11 +19338,14 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         updateSelectionTextPosition();
 
-        if (restoreToSponosoredAlpha != -1) {
-            canvas.restoreToCount(restoreToSponosoredAlpha);
-        }
+            if (restoreToSponosoredAlpha != -1) {
+                canvas.restoreToCount(restoreToSponosoredAlpha);
+            }
 
-        canvas.restoreToCount(restore);
+            canvas.restoreToCount(restore);
+        } finally {
+            restoreDeletedMessagePaintFilters(deletedMessagePaintFilters);
+        }
     }
 
     @SuppressLint("WrongCall")
@@ -22832,6 +22912,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             canvas.translate(drawTimeX = timeTitleTimeX + additionalX, drawTimeY = timeY - dp(7.3f) - timeLayout.getHeight());
             SpoilerEffect.layoutDrawMaybe(timeLayout, canvas);
             canvas.restore();
+            drawDeletedMessageMarker(canvas, timeLayout);
             Theme.chat_timePaint.setAlpha(255);
         } else {
             if (currentMessageObject.isSponsored()) {
@@ -22925,6 +23006,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 SpoilerEffect.layoutDrawMaybe(timeLayout, canvas);
             }
             canvas.restore();
+            drawDeletedMessageMarker(canvas, timeLayout);
         }
 
         if (currentMessageObject.isOutOwner()) {

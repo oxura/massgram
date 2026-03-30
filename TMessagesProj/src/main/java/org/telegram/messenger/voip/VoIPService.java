@@ -102,6 +102,7 @@ import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.GhostModeManager;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
@@ -746,6 +747,29 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 
 	private HashMap<String, ProxyVideoSink> remoteSinks = new HashMap<>();
 
+	private boolean shouldForceRelayCalls() {
+		return GhostModeManager.getInstance().shouldForceRelayCalls();
+	}
+
+	private void applyRelayOnlyProtocol(TL_phone.PhoneCallProtocol protocol) {
+		if (protocol == null || !shouldForceRelayCalls()) {
+			return;
+		}
+		// Privacy mode keeps only relay transport so the peer never receives P2P candidates.
+		protocol.udp_p2p = false;
+		protocol.udp_reflector = true;
+	}
+
+	private void applyRelayOnlyPrivacy(TL_phone.PhoneCall phoneCall) {
+		if (phoneCall == null || !shouldForceRelayCalls()) {
+			return;
+		}
+		phoneCall.p2p_allowed = false;
+		if (phoneCall.protocol != null) {
+			applyRelayOnlyProtocol(phoneCall.protocol);
+		}
+	}
+
 	@Nullable
 	@Override
 	public IBinder onBind(Intent intent) {
@@ -928,6 +952,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 		} else {
 			NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.closeInCallActivity);
 			privateCall = callIShouldHavePutIntoIntent;
+			applyRelayOnlyPrivacy(privateCall);
 			videoCall = privateCall != null && privateCall.video;
 			if (videoCall) {
 				isVideoAvailable = true;
@@ -1106,6 +1131,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 				reqCall.video = videoCall;
 				reqCall.protocol.udp_p2p = true;
 				reqCall.protocol.udp_reflector = true;
+				applyRelayOnlyProtocol(reqCall.protocol);
 				reqCall.protocol.min_layer = CALL_MIN_LAYER;
 				reqCall.protocol.max_layer = Instance.getConnectionMaxLayer();
 				Collections.addAll(reqCall.protocol.library_versions, NativeInstance.getAllVersions());
@@ -1116,6 +1142,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 				ConnectionsManager.getInstance(currentAccount).sendRequest(reqCall, (response12, error12) -> AndroidUtilities.runOnUIThread(() -> {
 					if (error12 == null) {
 						privateCall = ((TL_phone.TL_phone_phoneCall) response12).phone_call;
+						applyRelayOnlyPrivacy(privateCall);
 						a_or_b = salt1;
 						dispatchStateChanged(STATE_WAITING);
 						if (endCallAfterRequest) {
@@ -1683,6 +1710,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 			FileLog.d("Call updated: " + phoneCall);
 		}
 		final long key_fingerprint = privateCall.key_fingerprint;
+		applyRelayOnlyPrivacy(phoneCall);
 		privateCall = phoneCall;
 		if (phoneCall instanceof TL_phone.TL_phoneCallDiscarded) {
 			needSendDebugLog = phoneCall.need_debug;
@@ -1874,12 +1902,14 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 		req.protocol.max_layer = Instance.getConnectionMaxLayer();
 		req.protocol.min_layer = CALL_MIN_LAYER;
 		req.protocol.udp_p2p = req.protocol.udp_reflector = true;
+		applyRelayOnlyProtocol(req.protocol);
 		Collections.addAll(req.protocol.library_versions, NativeInstance.getAllVersions());
 		ConnectionsManager.getInstance(currentAccount).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
 			if (error != null) {
 				callFailed();
 			} else {
 				privateCall = ((TL_phone.TL_phone_phoneCall) response).phone_call;
+				applyRelayOnlyPrivacy(privateCall);
 				initiateActualEncryptedCall();
 			}
 		}));
@@ -3416,6 +3446,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 			final boolean enableNs = !(sysNsAvailable && serverConfig.useSystemNs);
 			final String logFilePath = BuildVars.DEBUG_VERSION ? VoIPHelper.getLogFilePath("voip" + privateCall.id) : VoIPHelper.getLogFilePath("" + privateCall.id, false);
 			final String statsLogFilePath = VoIPHelper.getLogFilePath("" + privateCall.id, true);
+			applyRelayOnlyPrivacy(privateCall);
 			final Instance.Config config = new Instance.Config(initializationTimeout, receiveTimeout, voipDataSaving, privateCall.p2p_allowed, enableAec, enableNs, true, false, serverConfig.enableStunMarking, logFilePath, statsLogFilePath, privateCall.protocol.max_layer, privateCall.custom_parameters == null ? "" : privateCall.custom_parameters.data);
 			lastLogFilePath = logFilePath;
 
@@ -4364,6 +4395,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 				req1.peer.access_hash = privateCall.access_hash;
 				req1.protocol = new TL_phone.TL_phoneCallProtocol();
 				req1.protocol.udp_p2p = req1.protocol.udp_reflector = true;
+				applyRelayOnlyProtocol(req1.protocol);
 				req1.protocol.min_layer = CALL_MIN_LAYER;
 				req1.protocol.max_layer = Instance.getConnectionMaxLayer();
 				Collections.addAll(req1.protocol.library_versions, NativeInstance.getAllVersions());
@@ -4373,6 +4405,7 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 							FileLog.w("accept call ok! " + response1);
 						}
 						privateCall = ((TL_phone.TL_phone_phoneCall) response1).phone_call;
+						applyRelayOnlyPrivacy(privateCall);
 						if (privateCall instanceof TL_phone.TL_phoneCallDiscarded) {
 							onCallUpdated(privateCall);
 						}

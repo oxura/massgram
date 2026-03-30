@@ -35,6 +35,7 @@ import org.telegram.messenger.FileLoadOperation;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.FileUploadOperation;
+import org.telegram.messenger.GhostModeManager;
 import org.telegram.messenger.KeepAliveJob;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
@@ -75,6 +76,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.SSLException;
+
+import org.telegram.tgnet.tl.TL_account;
 
 public class ConnectionsManager extends BaseController {
 
@@ -356,16 +359,60 @@ public class ConnectionsManager extends BaseController {
 
     public int sendRequestSync(final TLObject object, final RequestDelegate onComplete, final QuickAckDelegate onQuickAck, final WriteToSocketDelegate onWriteToSocket, final int flags, final int datacenterId, final int connectionType, final boolean immediate) {
         final int requestToken = lastRequestToken.getAndIncrement();
+        if (dispatchGhostModeIntercept(object, onComplete, null, requestToken)) {
+            return requestToken;
+        }
         sendRequestInternal(object, onComplete, null, onQuickAck, onWriteToSocket, flags, datacenterId, connectionType, immediate, requestToken);
         return requestToken;
     }
 
     public int sendRequest(final TLObject object, final RequestDelegate onComplete, final RequestDelegateTimestamp onCompleteTimestamp, final QuickAckDelegate onQuickAck, final WriteToSocketDelegate onWriteToSocket, final int flags, final int datacenterId, final int connectionType, final boolean immediate) {
         final int requestToken = lastRequestToken.getAndIncrement();
+        if (dispatchGhostModeIntercept(object, onComplete, onCompleteTimestamp, requestToken)) {
+            return requestToken;
+        }
         Utilities.stageQueue.postRunnable(() -> {
             sendRequestInternal(object, onComplete, onCompleteTimestamp, onQuickAck, onWriteToSocket, flags, datacenterId, connectionType, immediate, requestToken);
         });
         return requestToken;
+    }
+
+    private boolean dispatchGhostModeIntercept(final TLObject object, final RequestDelegate onComplete, final RequestDelegateTimestamp onCompleteTimestamp, final int requestToken) {
+        if (!GhostModeManager.getInstance().isGhostModeEnabled() || !shouldInterceptGhostModeRequest(object)) {
+            return false;
+        }
+        final TLObject response = createGhostModeResponse(object);
+        Utilities.stageQueue.postRunnable(() -> {
+            if (onComplete != null) {
+                onComplete.run(response, null);
+            } else if (onCompleteTimestamp != null) {
+                onCompleteTimestamp.run(response, null, System.currentTimeMillis());
+            }
+        });
+        if (BuildVars.LOGS_ENABLED) {
+            FileLog.d("ghost mode intercepted request " + object + " token = " + requestToken);
+        }
+        return true;
+    }
+
+    private boolean shouldInterceptGhostModeRequest(TLObject object) {
+        return object instanceof TL_account.updateStatus
+            || object instanceof TLRPC.TL_messages_setTyping
+            || object instanceof TLRPC.TL_messages_setEncryptedTyping
+            || object instanceof TLRPC.TL_messages_readHistory
+            || object instanceof TLRPC.TL_channels_readHistory
+            || object instanceof TLRPC.TL_messages_readDiscussion
+            || object instanceof TLRPC.TL_messages_readMentions
+            || object instanceof TLRPC.TL_messages_readReactions;
+    }
+
+    private TLObject createGhostModeResponse(TLObject object) {
+        if (object instanceof TL_account.updateStatus
+            || object instanceof TLRPC.TL_messages_setTyping
+            || object instanceof TLRPC.TL_messages_setEncryptedTyping) {
+            return new TLRPC.TL_boolTrue();
+        }
+        return null;
     }
 
     private void sendRequestInternal(TLObject object, RequestDelegate onComplete, RequestDelegateTimestamp onCompleteTimestamp, QuickAckDelegate onQuickAck, WriteToSocketDelegate onWriteToSocket, int flags, int datacenterId, int connectionType, boolean immediate, int requestToken) {

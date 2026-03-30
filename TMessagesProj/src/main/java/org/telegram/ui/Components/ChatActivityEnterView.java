@@ -127,6 +127,7 @@ import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.GhostModeManager;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
@@ -5673,7 +5674,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 }
                 if (editingMessageObject == null && !canWriteToChannel && message.length() != 0 && lastTypingTimeSend < System.currentTimeMillis() - 5000 && !ignoreTextChange) {
                     lastTypingTimeSend = System.currentTimeMillis();
-                    if (delegate != null) {
+                    if (delegate != null && !GhostModeManager.getInstance().isGhostModeEnabled()) {
                         delegate.needSendTyping();
                     }
                 }
@@ -8616,7 +8617,9 @@ public class ChatActivityEnterView extends FrameLayout implements
                 lastRecordState = recordState;
                 return;
             }
-            accountInstance.getMessagesController().sendTyping(dialog_id, getThreadMessageId(), 2, 0);
+            if (!GhostModeManager.getInstance().isGhostModeEnabled()) {
+                accountInstance.getMessagesController().sendTyping(dialog_id, getThreadMessageId(), 2, 0);
+            }
             recordInterfaceState = 0;
             if (emojiView != null) {
                 emojiView.setEnabled(true);
@@ -12460,7 +12463,9 @@ public class ChatActivityEnterView extends FrameLayout implements
 
             if (recordInterfaceState != 0 && !wasSendTyping && !isInScheduleMode()) {
                 wasSendTyping = true;
-                accountInstance.getMessagesController().sendTyping(dialog_id, getThreadMessageId(), isInVideoMode() ? 7 : 1, 0);
+                if (!GhostModeManager.getInstance().isGhostModeEnabled()) {
+                    accountInstance.getMessagesController().sendTyping(dialog_id, getThreadMessageId(), isInVideoMode() ? 7 : 1, 0);
+                }
             }
 
             if (recordCircle != null) {
@@ -13424,7 +13429,9 @@ public class ChatActivityEnterView extends FrameLayout implements
 
             if (isRunning && currentTimeMillis > lastSendTypingTime + 5000) {
                 lastSendTypingTime = currentTimeMillis;
-                MessagesController.getInstance(currentAccount).sendTyping(dialog_id, getThreadMessageId(), isInVideoMode() ? 7 : 1, 0);
+                if (!GhostModeManager.getInstance().isGhostModeEnabled()) {
+                    MessagesController.getInstance(currentAccount).sendTyping(dialog_id, getThreadMessageId(), isInVideoMode() ? 7 : 1, 0);
+                }
             }
 
             String newString = AndroidUtilities.formatTimerDurationFast((int) time, ms);

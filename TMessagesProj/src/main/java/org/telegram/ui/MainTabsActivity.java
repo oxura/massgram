@@ -404,8 +404,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         // o.add(R.drawable.msg_leave, getString(R.string.LogOut), true, () -> presentFragment(new LogoutActivity()));
         o.setBlur(true);
         o.translate(0, -dp(4));
-        final ShapeDrawable bg = Theme.createRoundRectDrawable(dp(28), getThemedColor(Theme.key_windowBackgroundWhite));
-        bg.getPaint().setShadowLayer(dp(6), 0, dp(1), Theme.multAlpha(0xFF000000, 0.15f));
+        final int accountSwitcherColor = Theme.getColor(Theme.key_glass_targetMainTabs, resourceProvider);
+        final ShapeDrawable bg = Theme.createRoundRectDrawable(dp(28), Theme.multAlpha(accountSwitcherColor, 0.94f));
+        bg.getPaint().setShadowLayer(dp(10), 0, dp(2), Theme.multAlpha(0xFF000000, 0.10f));
         o.setScrimViewBackground(bg);
         o.show();
 

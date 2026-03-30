@@ -688,6 +688,9 @@ public class ApplicationLoader extends Application {
     public boolean isCustomUpdate() {
         return false;
     }
+    public boolean hasCustomUpdateConfig() {
+        return false;
+    }
     public void downloadUpdate() {}
     public void cancelDownloadingUpdate() {}
     public boolean isDownloadingUpdate() {
@@ -698,6 +701,9 @@ public class ApplicationLoader extends Application {
     }
     public void checkUpdate(boolean force, Runnable whenDone) {}
     public BetaUpdate getUpdate() {
+        return null;
+    }
+    public String getLastUpdateError() {
         return null;
     }
     public File getDownloadedUpdateFile() {
