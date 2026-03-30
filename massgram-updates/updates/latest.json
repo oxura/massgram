@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.2",
-    "versionCode":  65829,
+    "versionName":  "12.5.3",
+    "versionCode":  65849,
     "apkUrl":  "https://github.com/oxura/massgram/releases/latest/download/massgram.apk",
-    "sha256":  "9204ed60855a5e4ea34da433dc19a037463eeb4c6aee6ad6339bc2598afb7eb7",
-    "apkSize":  131385718,
-    "changelog":  "Massgram 12.5.2\n\n- Added beta update row for selected testers in Massgram settings."
+    "sha256":  "f11ce0f3e073f75eecb354868f3e6518106fbf8cafaecf41e3c70d38cde18a87",
+    "apkSize":  131391274,
+    "changelog":  "Massgram 12.5.3\n\n- Added profile Massgram indicator\n- Added local AES chat encryption for private dialogs"
 }
 
