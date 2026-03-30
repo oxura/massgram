@@ -1,5 +1,7 @@
 package org.telegram.messenger;
 
+import android.app.Activity;
+import android.content.Context;
 import android.content.SharedPreferences;
 
 public class MassgramConfigManager {
@@ -108,6 +110,10 @@ public class MassgramConfigManager {
     }
 
     private SharedPreferences getPreferences() {
-        return MessagesController.getGlobalMainSettings();
+        Context context = ApplicationLoader.applicationContext;
+        if (context == null) {
+            throw new IllegalStateException("Application context is not initialized");
+        }
+        return context.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
     }
 }
