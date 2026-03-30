@@ -302,6 +302,12 @@
     <string name="MassgramContributorTitle">Тестирование и разработка</string>
     <string name="MassgramContributorHandle">@kakadkl</string>
     <string name="MassgramContributorInfo">Помогал с тестированием мода и доработкой части процесса разработки.</string>
+    <string name="MassgramProfileDetected">Massgram</string>
+    <string name="MassgramProfileDetectedValue">Клиент Massgram обнаружен</string>
+    <string name="MassgramProfileEncryption">Локальное шифрование</string>
+    <string name="MassgramProfileEncryptionEnabledBulletin">Локальное шифрование включено</string>
+    <string name="MassgramProfileEncryptionDisabledBulletin">Локальное шифрование выключено</string>
+    <string name="MassgramProfileEncryptionEnabledBulletinInfo">Новые текстовые сообщения в этом личном чате будут отправляться в зашифрованном формате Massgram.</string>
     <string name="MassgramLockChat">Закрыть чат</string>
     <string name="MassgramUnlockChat">Открыть чат</string>
     <string name="MassgramCreateChatPinTitle">Создать PIN для чата</string>

@@ -2313,6 +2313,12 @@
     <string name="MassgramContributorTitle">Testing and development</string>
     <string name="MassgramContributorHandle">@kakadkl</string>
     <string name="MassgramContributorInfo">Helped with testing the mod and refining parts of the development workflow.</string>
+    <string name="MassgramProfileDetected">Massgram</string>
+    <string name="MassgramProfileDetectedValue">Massgram client detected</string>
+    <string name="MassgramProfileEncryption">Local encryption</string>
+    <string name="MassgramProfileEncryptionEnabledBulletin">Local encryption enabled</string>
+    <string name="MassgramProfileEncryptionDisabledBulletin">Local encryption disabled</string>
+    <string name="MassgramProfileEncryptionEnabledBulletinInfo">New text messages in this private chat will be sent in Massgram encrypted format.</string>
     <string name="MassgramViewPreviousEdit">View previous version</string>
     <string name="MassgramPreviousEditTitle">Before edit</string>
     <string name="MassgramPreviousEditInfo">This is the last locally saved text before the message was edited.</string>

@@ -146,6 +146,7 @@ import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LanguageDetector;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramCryptoManager;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -649,6 +650,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int userInfoRow;
     private int channelInfoRow;
     private int usernameRow;
+    private int massgramClientRow;
+    private int massgramEncryptionRow;
     private int notificationsDividerRow;
     private int notificationsRow;
     private int bizHoursRow;
@@ -4370,6 +4373,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 onWriteButtonClick();
             } else if (position == reportRow) {
                 ReportBottomSheet.openChat(ProfileActivity.this, getDialogId());
+            } else if (position == massgramEncryptionRow) {
+                toggleMassgramEncryption();
             } else if (position >= membersStartRow && position < membersEndRow) {
                 TLRPC.ChatParticipant participant;
                 if (!sortedUsers.isEmpty()) {
@@ -8775,6 +8780,30 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return listView;
     }
 
+    private boolean canShowMassgramRows() {
+        if (userId == 0 || myProfile || isBot || currentEncryptedChat != null) {
+            return false;
+        }
+        TLRPC.User user = getMessagesController().getUser(userId);
+        return user != null && !user.bot && user.id != getUserConfig().getClientUserId();
+    }
+
+    private void toggleMassgramEncryption() {
+        if (!canShowMassgramRows()) {
+            return;
+        }
+        MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+        boolean enabled = !cryptoManager.isEncryptionEnabled(userId);
+        cryptoManager.setEncryptionEnabled(userId, enabled);
+        updateListAnimated(false);
+        if (BulletinFactory.canShowBulletin(this)) {
+            BulletinFactory.of(this).createSimpleBulletin(
+                enabled ? LocaleController.getString(R.string.MassgramProfileEncryptionEnabledBulletin) : LocaleController.getString(R.string.MassgramProfileEncryptionDisabledBulletin),
+                enabled ? LocaleController.getString(R.string.MassgramProfileEncryptionEnabledBulletinInfo) : null
+            ).show();
+        }
+    }
+
     private void needLayoutText(float diff) {
         needLayoutText(diff, 0, true);
     }
@@ -9149,6 +9178,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             final long did = getDialogId();
             if (did == (Long) args[0]) {
                 boolean enc = DialogObject.isEncryptedDialog(did);
+                boolean hadMassgramPeer = userId != 0 && MassgramCryptoManager.getInstance(currentAccount).isPeerDetected(userId);
                 ArrayList<MessageObject> arr = (ArrayList<MessageObject>) args[1];
                 for (int a = 0; a < arr.size(); a++) {
                     MessageObject obj = arr.get(a);
@@ -9158,6 +9188,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             listAdapter.notifyDataSetChanged();
                         }
                     }
+                }
+                if (userId != 0 && hadMassgramPeer != MassgramCryptoManager.getInstance(currentAccount).isPeerDetected(userId)) {
+                    updateListAnimated(false);
                 }
             }
         } else if (id == NotificationCenter.emojiLoaded) {
@@ -10308,6 +10341,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         locationRow = -1;
         channelInfoRow = -1;
         usernameRow = -1;
+        massgramClientRow = -1;
+        massgramEncryptionRow = -1;
         settingsTimerRow = -1;
         settingsKeyRow = -1;
         notificationsDividerRow = -1;
@@ -10494,6 +10529,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (user != null && username != null) {
                     usernameRow = rowCount++;
+                }
+                if (canShowMassgramRows()) {
+                    if (MassgramCryptoManager.getInstance(currentAccount).isPeerDetected(userId)) {
+                        massgramClientRow = rowCount++;
+                    }
+                    massgramEncryptionRow = rowCount++;
                 }
                 if (userInfo != null) {
                     if (userInfo.birthday != null) {
@@ -13209,6 +13250,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 
                             containsGift = !myProfile && today && !getMessagesController().premiumPurchaseBlocked();
                         }
+                    } else if (position == massgramClientRow) {
+                        detailCell.setTextAndValue(LocaleController.getString(R.string.MassgramProfileDetectedValue), LocaleController.getString(R.string.MassgramProfileDetected), massgramEncryptionRow != -1);
                     } else if (position == phoneRow) {
                         String text;
                         TLRPC.User user = getMessagesController().getUser(userId);
@@ -13529,6 +13572,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         textCell.setText(LocaleController.getString(R.string.ReportUserLocation), false);
                         textCell.setColors(-1, Theme.key_text_RedRegular);
                         textCell.setColors(-1, Theme.key_text_RedRegular);
+                    } else if (position == massgramEncryptionRow) {
+                        boolean enabled = MassgramCryptoManager.getInstance(currentAccount).isEncryptionEnabled(userId);
+                        textCell.setTextAndValueAndIcon(LocaleController.getString(R.string.MassgramProfileEncryption), LocaleController.getString(enabled ? R.string.NotificationsOn : R.string.NotificationsOff), R.drawable.msg2_secret, notificationsRow != -1);
                     } else if (position == languageRow) {
                         textCell.setTextAndValueAndIcon(LocaleController.getString(R.string.Language), LocaleController.getCurrentLanguageName(), false, R.drawable.msg2_language, false);
                         textCell.setImageLeft(23);
@@ -13983,6 +14029,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
             }
+            if (holder.getAdapterPosition() == massgramClientRow) {
+                return false;
+            }
             int type = holder.getItemViewType();
             return type != VIEW_TYPE_HEADER && type != VIEW_TYPE_DIVIDER && type != VIEW_TYPE_SHADOW &&
                     type != VIEW_TYPE_EMPTY && type != VIEW_TYPE_EMPTY2 && type != VIEW_TYPE_HEADER_EMPTY && type != VIEW_TYPE_BOTTOM_PADDING && type != VIEW_TYPE_SHARED_MEDIA &&
@@ -13999,7 +14048,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
                 return VIEW_TYPE_HEADER;
-            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow) {
+            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow || position == massgramClientRow) {
                 return VIEW_TYPE_TEXT_DETAIL;
             } else if (position == usernameRow || position == setUsernameRow) {
                 return VIEW_TYPE_TEXT_DETAIL_MULTILINE;
@@ -14017,7 +14066,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     position == clearLogsRow || position == switchBackendRow || position == setAvatarRow || position == addToGroupButtonRow ||
                     position == addToContactsRow || position == liteModeRow || position == premiumGiftingRow || position == businessRow ||
                     position == botStarsBalanceRow || position == botTonBalanceRow || position == channelBalanceRow || position == botPermissionLocation ||
-                    position == botPermissionBiometry || position == botPermissionEmojiStatus || position == tonRow
+                    position == botPermissionBiometry || position == botPermissionEmojiStatus || position == tonRow || position == massgramEncryptionRow
             ) {
                 return VIEW_TYPE_TEXT;
             } else if (position == notificationsDividerRow) {
@@ -15400,6 +15449,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, userInfoRow, sparseIntArray);
             put(++pointer, channelInfoRow, sparseIntArray);
             put(++pointer, usernameRow, sparseIntArray);
+            put(++pointer, massgramClientRow, sparseIntArray);
+            put(++pointer, massgramEncryptionRow, sparseIntArray);
             put(++pointer, notificationsDividerRow, sparseIntArray);
             put(++pointer, reportDividerRow, sparseIntArray);
             put(++pointer, notificationsRow, sparseIntArray);

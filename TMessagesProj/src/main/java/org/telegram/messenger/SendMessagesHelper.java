@@ -3189,6 +3189,19 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             // Privacy mode always edits messages without webpage previews.
             searchLinks = false;
         }
+        if (message != null) {
+            long dialogId = messageObject.getDialogId();
+            MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+            if (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(messageObject.messageOwner != null ? messageObject.messageOwner.message : null)) {
+                String encryptedMessage = cryptoManager.encryptOutgoingText(dialogId, message);
+                if (encryptedMessage == null) {
+                    return 0;
+                }
+                message = encryptedMessage;
+                searchLinks = false;
+                entities = null;
+            }
+        }
 
         final TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
         req.peer = getMessagesController().getInputPeer(messageObject.getDialogId());
@@ -3885,6 +3898,34 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
         if (message == null && caption == null) {
             caption = "";
+        }
+        if (retryMessageObject == null && DialogObject.isUserDialog(peer)) {
+            MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+            if (cryptoManager.isEncryptionEnabled(peer)) {
+                boolean encryptedAnyText = false;
+                if (!TextUtils.isEmpty(message)) {
+                    String encryptedMessage = cryptoManager.encryptOutgoingText(peer, message);
+                    if (encryptedMessage == null) {
+                        return;
+                    }
+                    message = encryptedMessage;
+                    encryptedAnyText = true;
+                }
+                if (!TextUtils.isEmpty(caption)) {
+                    String encryptedCaption = cryptoManager.encryptOutgoingText(peer, caption);
+                    if (encryptedCaption == null) {
+                        return;
+                    }
+                    caption = encryptedCaption;
+                    encryptedAnyText = true;
+                }
+                if (encryptedAnyText) {
+                    searchLinks = false;
+                    webPage = null;
+                    mediaWebPage = null;
+                    entities = null;
+                }
+            }
         }
 
         long _payStars = getMessagesController().getSendPaidMessagesStars(peer);

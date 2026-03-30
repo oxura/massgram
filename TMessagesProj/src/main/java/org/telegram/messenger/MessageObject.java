@@ -3649,7 +3649,7 @@ public class MessageObject {
         } else if (messageOwner != null && (force || translated || summarized)) {
             translated = false;
             summarized = false;
-            applyNewText(messageOwner.message);
+            applyNewText(getDisplayedMessageText());
             generateCaption();
             return replyUpdated || true;
         }
@@ -3659,7 +3659,14 @@ public class MessageObject {
     public void applyNewText() {
         translated = false;
         summarized = false;
-        applyNewText(messageOwner.message);
+        applyNewText(getDisplayedMessageText());
+    }
+
+    private String getDisplayedMessageText() {
+        if (messageOwner == null) {
+            return null;
+        }
+        return MassgramCryptoManager.getInstance(currentAccount).getDisplayText(getDialogId(), messageOwner.message, !isOutOwner());
     }
 
     public void applyNewText(CharSequence text) {
@@ -4418,6 +4425,7 @@ public class MessageObject {
         }
         TLObject fromObject = fromUser != null ? fromUser : fromChat;
         drawServiceWithDefaultTypeface = false;
+        final String displayMessageText = getDisplayedMessageText();
 
         channelJoined = false;
         if (messageOwner instanceof TLRPC.TL_messageService) {
@@ -5811,18 +5819,18 @@ public class MessageObject {
                     }
                 }
             } else {
-                if (messageOwner.message != null) {
+                if (displayMessageText != null) {
                     try {
-                        if (messageOwner.message.length() > 200) {
-                            messageText = AndroidUtilities.BAD_CHARS_MESSAGE_LONG_PATTERN.matcher(messageOwner.message).replaceAll("\u200C");
+                        if (displayMessageText.length() > 200) {
+                            messageText = AndroidUtilities.BAD_CHARS_MESSAGE_LONG_PATTERN.matcher(displayMessageText).replaceAll("\u200C");
                         } else {
-                            messageText = AndroidUtilities.BAD_CHARS_MESSAGE_PATTERN.matcher(messageOwner.message).replaceAll("\u200C");
+                            messageText = AndroidUtilities.BAD_CHARS_MESSAGE_PATTERN.matcher(displayMessageText).replaceAll("\u200C");
                         }
                     } catch (Throwable e) {
-                        messageText = messageOwner.message;
+                        messageText = displayMessageText;
                     }
                 } else {
-                    messageText = messageOwner.message;
+                    messageText = displayMessageText;
                 }
             }
         }
@@ -6998,7 +7006,7 @@ public class MessageObject {
         ) {
             return;
         }
-        String text = messageOwner.message;
+        String text = getDisplayedMessageText();
         ArrayList<TLRPC.MessageEntity> entities = messageOwner.entities;
         boolean forceManualEntities = false;
         if (type == TYPE_STORY) {
