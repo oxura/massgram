@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.1-beta-channel",
-    "versionCode":  65819,
+    "versionName":  "12.5.2-beta-channel",
+    "versionCode":  65829,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "5696d0fa27968abcaa223ce2a43f9a9284724cdbdac1e1b1fde7bcb4ee9aad90",
-    "apkSize":  138414968,
-    "changelog":  "Massgram beta channel initialized."
+    "sha256":  "9204ed60855a5e4ea34da433dc19a037463eeb4c6aee6ad6339bc2598afb7eb7",
+    "apkSize":  131385718,
+    "changelog":  "Massgram beta channel base updated to 12.5.2."
 }
 
