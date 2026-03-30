@@ -28,6 +28,7 @@ import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.BulletinFactory;
@@ -48,6 +49,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private static final int BUTTON_FORCE_RELAY_CALLS = 4;
     private static final int BUTTON_DISABLE_LINK_PREVIEWS = 5;
     private static final int BUTTON_CHECK_UPDATES = 6;
+    private static final int BUTTON_CHECK_BETA_UPDATES = 7;
 
     private final HashSet<Integer> expandedInfoRows = new HashSet<>();
 
@@ -59,6 +61,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private MassgramSettingRow relayCallsRow;
     private MassgramSettingRow disableLinkPreviewRow;
     private MassgramActionRow updateRow;
+    private MassgramActionRow betaUpdateRow;
     private MassgramDeveloperCard developerCard;
 
     @Override
@@ -141,6 +144,10 @@ public class MassgramSettingsActivity extends UniversalFragment {
         LinearLayout updatesCard = createSectionCard(context);
         updateRow = new MassgramActionRow(context, R.drawable.msg_download_settings);
         updatesCard.addView(updateRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        if (isCurrentAccountBetaTester()) {
+            betaUpdateRow = new MassgramActionRow(context, R.drawable.msg_download_settings);
+            updatesCard.addView(betaUpdateRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        }
         settingsContentView.addView(updatesCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         settingsContentView.addView(createSpacer(context, 14));
@@ -233,8 +240,18 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 LocaleController.getString(R.string.MassgramCheckUpdates),
                 LocaleController.formatString("MassgramCurrentVersion", R.string.MassgramCurrentVersion, BuildVars.BUILD_VERSION_STRING),
                 LocaleController.getString(R.string.Update),
-                true,
+                betaUpdateRow == null,
                 this::checkForUpdates
+            );
+        }
+        if (betaUpdateRow != null) {
+            betaUpdateRow.bind(
+                BUTTON_CHECK_BETA_UPDATES,
+                LocaleController.getString(R.string.MassgramBetaCheckUpdates),
+                LocaleController.formatString("MassgramBetaCurrentVersion", R.string.MassgramBetaCurrentVersion, BuildVars.BUILD_VERSION_STRING),
+                LocaleController.getString(R.string.Update),
+                true,
+                this::checkForBetaUpdates
             );
         }
         if (developerCard != null) {
@@ -317,6 +334,43 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.YourVersionIsLatest)).show();
             }
         });
+    }
+
+    private void checkForBetaUpdates() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        if (!isCurrentAccountBetaTester()) {
+            return;
+        }
+        if (!ApplicationLoader.applicationLoaderInstance.hasCustomBetaUpdateConfig()) {
+            showDialog(AlertsCreator.createSimpleAlert(
+                getParentActivity(),
+                LocaleController.getString(R.string.MassgramBetaCheckUpdates),
+                LocaleController.getString(R.string.MassgramBetaUpdateSourceNotConfigured)
+            ).create());
+            return;
+        }
+        ApplicationLoader.applicationLoaderInstance.checkBetaUpdate(true, () -> {
+            if (getParentActivity() == null) {
+                return;
+            }
+            String error = ApplicationLoader.applicationLoaderInstance.getLastBetaUpdateError();
+            if (!TextUtils.isEmpty(error)) {
+                BulletinFactory.of(this).createErrorBulletin(error).show();
+                return;
+            }
+            BetaUpdate update = ApplicationLoader.applicationLoaderInstance.getBetaUpdate();
+            if (update != null) {
+                ApplicationLoader.applicationLoaderInstance.showCustomBetaUpdateAppPopup(getParentActivity(), update, currentAccount);
+            } else {
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.MassgramBetaYourVersionIsLatest)).show();
+            }
+        });
+    }
+
+    private boolean isCurrentAccountBetaTester() {
+        return ApplicationLoader.applicationLoaderInstance.isBetaTester(UserConfig.getInstance(currentAccount).getClientUserId());
     }
 
     private void updateLanguagePill() {

@@ -287,6 +287,15 @@
     <string name="MassgramUpdateDownloadFailed">Massgram не смог скачать пакет обновления.</string>
     <string name="MassgramUpdateInvalidManifest">Скачанный пакет не прошёл проверку целостности.</string>
     <string name="MassgramUpdateDownloaded">Пакет обновления готов к установке.</string>
+    <string name="MassgramBetaCheckUpdates">Проверить бета-обновления</string>
+    <string name="MassgramBetaCurrentVersion">Бета-канал для тестеров. Текущая базовая версия: %1$s</string>
+    <string name="MassgramBetaUpdateSourceNotConfigured">Источник бета-обновлений Massgram ещё не настроен.</string>
+    <string name="MassgramBetaUpdateCheckFailed">Massgram не смог проверить бета-обновления сейчас.</string>
+    <string name="MassgramBetaUpdateDownloadFailed">Massgram не смог скачать пакет бета-обновления.</string>
+    <string name="MassgramBetaUpdateInvalidManifest">Скачанный бета-пакет не прошёл проверку целостности.</string>
+    <string name="MassgramBetaUpdateDownloaded">Пакет бета-обновления готов к установке.</string>
+    <string name="MassgramBetaUpdateInfo">Эта бета-сборка распространяется только для выбранных тестеров Massgram.</string>
+    <string name="MassgramBetaYourVersionIsLatest">Текущая бета-версия уже актуальна.</string>
     <string name="MassgramDeveloperTitle">Разработчик</string>
     <string name="MassgramDeveloperHandle">@awenqo</string>
     <string name="MassgramDeveloperInfo">По вопросам о Massgram, партнёрству, фидбеку по текущему функционалу или предложениям новых функций можно написать разработчику в Telegram.</string>

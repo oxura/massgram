@@ -691,6 +691,12 @@ public class ApplicationLoader extends Application {
     public boolean hasCustomUpdateConfig() {
         return false;
     }
+    public boolean hasCustomBetaUpdateConfig() {
+        return false;
+    }
+    public boolean isBetaTester(long userId) {
+        return false;
+    }
     public void downloadUpdate() {}
     public void cancelDownloadingUpdate() {}
     public boolean isDownloadingUpdate() {
@@ -705,6 +711,16 @@ public class ApplicationLoader extends Application {
     }
     public String getLastUpdateError() {
         return null;
+    }
+    public void checkBetaUpdate(boolean force, Runnable whenDone) {}
+    public BetaUpdate getBetaUpdate() {
+        return null;
+    }
+    public String getLastBetaUpdateError() {
+        return null;
+    }
+    public boolean showCustomBetaUpdateAppPopup(Context context, BetaUpdate update, int account) {
+        return false;
     }
     public File getDownloadedUpdateFile() {
         return null;

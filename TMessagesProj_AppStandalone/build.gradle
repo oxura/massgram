@@ -124,6 +124,7 @@ android {
         targetSdkVersion 35
         versionName APP_VERSION_NAME
         buildConfigField "String", "MASSGRAM_UPDATE_URL", "\"${(project.findProperty('MASSGRAM_UPDATE_URL') ?: '').toString()}\""
+        buildConfigField "String", "MASSGRAM_BETA_UPDATE_URL", "\"${(project.findProperty('MASSGRAM_BETA_UPDATE_URL') ?: '').toString()}\""
         ndkVersion "21.4.7075529"
 
         multiDexEnabled true

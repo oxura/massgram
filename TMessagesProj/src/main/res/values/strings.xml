@@ -2298,6 +2298,15 @@
     <string name="MassgramUpdateDownloadFailed">Massgram could not download the update package.</string>
     <string name="MassgramUpdateInvalidManifest">The downloaded package did not pass integrity verification.</string>
     <string name="MassgramUpdateDownloaded">The update package is ready to install.</string>
+    <string name="MassgramBetaCheckUpdates">Check beta updates</string>
+    <string name="MassgramBetaCurrentVersion">Beta channel for testers. Current base version: %1$s</string>
+    <string name="MassgramBetaUpdateSourceNotConfigured">Massgram beta update source is not configured yet.</string>
+    <string name="MassgramBetaUpdateCheckFailed">Massgram could not check beta updates right now.</string>
+    <string name="MassgramBetaUpdateDownloadFailed">Massgram could not download the beta update package.</string>
+    <string name="MassgramBetaUpdateInvalidManifest">The downloaded beta package did not pass integrity verification.</string>
+    <string name="MassgramBetaUpdateDownloaded">The beta update package is ready to install.</string>
+    <string name="MassgramBetaUpdateInfo">This beta build is distributed only to selected Massgram testers.</string>
+    <string name="MassgramBetaYourVersionIsLatest">Your beta build is up to date.</string>
     <string name="MassgramDeveloperTitle">Developer</string>
     <string name="MassgramDeveloperHandle">@awenqo</string>
     <string name="MassgramDeveloperInfo">For questions about Massgram, partnership requests, feedback on current functionality, or suggestions for new features, contact the developer in Telegram.</string>

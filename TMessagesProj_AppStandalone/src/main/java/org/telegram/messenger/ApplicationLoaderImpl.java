@@ -130,6 +130,16 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
     }
 
     @Override
+    public boolean hasCustomBetaUpdateConfig() {
+        return MassgramUpdateManager.getInstance().isBetaConfigured();
+    }
+
+    @Override
+    public boolean isBetaTester(long userId) {
+        return MassgramUpdateManager.getInstance().isBetaTester(userId);
+    }
+
+    @Override
     public void downloadUpdate() {
         MassgramUpdateManager.getInstance().downloadUpdate();
     }
@@ -172,6 +182,26 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
     @Override
     public boolean showCustomUpdateAppPopup(Context context, BetaUpdate update, int account) {
         return MassgramUpdateManager.getInstance().showUpdatePopup(context, update);
+    }
+
+    @Override
+    public void checkBetaUpdate(boolean force, Runnable whenDone) {
+        MassgramUpdateManager.getInstance().checkUpdate(MassgramUpdateManager.Channel.BETA, force, whenDone);
+    }
+
+    @Override
+    public BetaUpdate getBetaUpdate() {
+        return MassgramUpdateManager.getInstance().getUpdate(MassgramUpdateManager.Channel.BETA);
+    }
+
+    @Override
+    public String getLastBetaUpdateError() {
+        return MassgramUpdateManager.getInstance().getLastUpdateError(MassgramUpdateManager.Channel.BETA);
+    }
+
+    @Override
+    public boolean showCustomBetaUpdateAppPopup(Context context, BetaUpdate update, int account) {
+        return MassgramUpdateManager.getInstance().showUpdatePopup(context, update, MassgramUpdateManager.Channel.BETA);
     }
 
     @Override
