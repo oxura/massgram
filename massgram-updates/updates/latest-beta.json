@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.4-beta4",
-    "versionCode":  65889,
+    "versionName":  "12.5.4-beta5",
+    "versionCode":  65899,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "aff5cd84ff58cb582496eebeea4919c06431040d0e8a382c70cca0d00d52895c",
-    "apkSize":  131433390,
-    "changelog":  "Massgram beta 12.5.4-beta4\n\n- Fixed the stable changelog source so release notes open again\n- Reworked the voice pitch button placement above the voice record button"
+    "sha256":  "862cb1273ed3b2fa3c3eb1cf8984a527dba2dc89f3ed4ac66460c12ea0340ae5",
+    "apkSize":  131433463,
+    "changelog":  "Massgram beta 12.5.4-beta5\n\n- Fixed the voice pitch button visibility in the real chat composer\n- Stable changelog source remains active for the update row"
 }
 

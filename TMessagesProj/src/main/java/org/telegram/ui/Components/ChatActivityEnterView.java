@@ -3091,7 +3091,8 @@ public class ChatActivityEnterView extends FrameLayout implements
         voicePitchButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
         voicePitchButton.setContentDescription(getString(R.string.MassgramVoicePitchTitle));
         voicePitchButton.setOnClickListener(v -> showMassgramVoicePitchSheet());
-        sendButtonContainer.addView(voicePitchButton, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 4, 4));
+        textFieldContainer.addView(voicePitchButton, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 4, DEFAULT_HEIGHT - 4));
+        voicePitchButton.bringToFront();
         updateMassgramVoicePitchButtonState();
 
 //        audioVideoButtonContainer.setOnTouchListener((view, motionEvent) -> {
@@ -5860,13 +5861,13 @@ public class ChatActivityEnterView extends FrameLayout implements
             voicePitchButton.setScaleX(audioVideoButtonContainer.getScaleX());
             voicePitchButton.setScaleY(audioVideoButtonContainer.getScaleY());
             voicePitchButton.setTranslationX(audioVideoButtonContainer.getTranslationX());
-            voicePitchButton.setTranslationY(audioVideoButtonContainer.getTranslationY() - dp(46));
+            voicePitchButton.setTranslationY(audioVideoButtonContainer.getTranslationY());
         } else {
             voicePitchButton.setAlpha(visible ? 1f : 0f);
             voicePitchButton.setScaleX(1f);
             voicePitchButton.setScaleY(1f);
             voicePitchButton.setTranslationX(0f);
-            voicePitchButton.setTranslationY(-dp(46));
+            voicePitchButton.setTranslationY(0f);
         }
     }
 
