@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.4-beta3",
-    "versionCode":  65879,
+    "versionName":  "12.5.4-beta4",
+    "versionCode":  65889,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "b775bc6da5e7335827e65b71bf2211fb9e7945b4d90de45c9f652d490ed3a6cb",
-    "apkSize":  131433348,
-    "changelog":  "Massgram beta 12.5.4-beta3\n\n- Moved the voice pitch control above the voice record button\n- Added a stable changelog sheet in Massgram settings\n- Improved private Massgram client detection without requiring AES"
+    "sha256":  "aff5cd84ff58cb582496eebeea4919c06431040d0e8a382c70cca0d00d52895c",
+    "apkSize":  131433390,
+    "changelog":  "Massgram beta 12.5.4-beta4\n\n- Fixed the stable changelog source so release notes open again\n- Reworked the voice pitch button placement above the voice record button"
 }
 
