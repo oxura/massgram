@@ -1,20 +1,27 @@
-[
-  {
-    "versionName": "12.5.3",
-    "versionCode": 65849,
-    "publishedAt": "2026-03-30T16:36:16Z",
-    "changelog": "Massgram 12.5.3\n\n- Added profile Massgram indicator\n- Added local AES chat encryption for private dialogs"
-  },
-  {
-    "versionName": "12.5.2",
-    "versionCode": 65829,
-    "publishedAt": "2026-03-30T15:13:05Z",
-    "changelog": "Massgram 12.5.2\n\n- Added beta update row in Massgram settings for selected testers.\n- Stable rollout for all users."
-  },
-  {
-    "versionName": "12.5.1",
-    "versionCode": 65819,
-    "publishedAt": "2026-03-30T06:40:54Z",
-    "changelog": "Massgram update\n\n- Initial public Massgram release\n- GitHub Releases based in-app updater\n- Current asset set: latest.json and massgram.apk"
-  }
+﻿[
+    {
+        "versionName":  "12.5.5",
+        "versionCode":  65919,
+        "publishedAt":  "2026-03-31T16:24:01Z",
+        "changelog":  "Massgram 12.5.5\n\n- Added an owner-only Massgram dashboard with total users, active now, offline counts and a searchable user list.\n- Added a lightweight once-per-minute heartbeat while the app is open to power Massgram online and offline status in the dashboard.\n- Heartbeat sends Telegram user ID, username or display name, app version, build channel, device model, Android version and locale.\n- Heartbeat does not send chat history, message text, media, contacts or call audio."
+    },
+    {
+        "versionName":  "12.5.3",
+        "versionCode":  65849,
+        "publishedAt":  "2026-03-30T16:36:16Z",
+        "changelog":  "Massgram 12.5.3\n\n- Added profile Massgram indicator\n- Added local AES chat encryption for private dialogs"
+    },
+    {
+        "versionName":  "12.5.2",
+        "versionCode":  65829,
+        "publishedAt":  "2026-03-30T15:13:05Z",
+        "changelog":  "Massgram 12.5.2\n\n- Added beta update row in Massgram settings for selected testers.\n- Stable rollout for all users."
+    },
+    {
+        "versionName":  "12.5.1",
+        "versionCode":  65819,
+        "publishedAt":  "2026-03-30T06:40:54Z",
+        "changelog":  "Massgram update\n\n- Initial public Massgram release\n- GitHub Releases based in-app updater\n- Current asset set: latest.json and massgram.apk"
+    }
 ]
+

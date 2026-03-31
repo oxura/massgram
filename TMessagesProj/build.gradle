@@ -102,6 +102,8 @@ android {
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion 35
+        buildConfigField "String", "MASSGRAM_SUPABASE_URL", "\"${(project.findProperty('MASSGRAM_SUPABASE_URL') ?: '').toString()}\""
+        buildConfigField "String", "MASSGRAM_SUPABASE_PUBLISHABLE_KEY", "\"${(project.findProperty('MASSGRAM_SUPABASE_PUBLISHABLE_KEY') ?: '').toString()}\""
 
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 

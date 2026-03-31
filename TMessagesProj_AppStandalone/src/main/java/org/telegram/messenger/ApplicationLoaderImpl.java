@@ -39,6 +39,7 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
     public void onCreate() {
         super.onCreate();
         MassgramUpdateManager.getInstance().initialize();
+        MassgramTelemetryManager.getInstance().initialize();
     }
 
     @Override
