@@ -51,7 +51,43 @@ $payload = [ordered]@{
 
 ($payload | ConvertTo-Json -Depth 5) + "`r`n" | Set-Content -Path $targetJson -Encoding UTF8
 
+if ($Channel -eq "stable") {
+    $targetChangelogJson = Join-Path $OutputDir "changelog-stable.json"
+    $history = @()
+    if (Test-Path $targetChangelogJson) {
+        $existingRaw = Get-Content -Path $targetChangelogJson -Raw
+        if (![string]::IsNullOrWhiteSpace($existingRaw)) {
+            $existing = $existingRaw | ConvertFrom-Json
+            if ($existing -is [System.Collections.IEnumerable]) {
+                foreach ($entry in $existing) {
+                    if ($null -ne $entry.versionCode -and [int]$entry.versionCode -ne $VersionCode) {
+                        $history += [ordered]@{
+                            versionName = [string]$entry.versionName
+                            versionCode = [int]$entry.versionCode
+                            publishedAt = [string]$entry.publishedAt
+                            changelog = [string]$entry.changelog
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $currentEntry = [ordered]@{
+        versionName = $VersionName
+        versionCode = $VersionCode
+        publishedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        changelog = $Changelog
+    }
+
+    $fullHistory = @($currentEntry) + $history | Select-Object -First 10
+    ($fullHistory | ConvertTo-Json -Depth 5) + "`r`n" | Set-Content -Path $targetChangelogJson -Encoding UTF8
+}
+
 Write-Host "Updated:"
 Write-Host "  APK:  $targetApk"
 Write-Host "  JSON: $targetJson"
+if ($Channel -eq "stable") {
+    Write-Host "  CHANGELOG: $(Join-Path $OutputDir 'changelog-stable.json')"
+}
 Write-Host "  SHA256: $hash"

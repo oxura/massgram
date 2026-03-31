@@ -15,6 +15,7 @@ import android.text.TextUtils;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.web.BuildConfig;
 import org.telegram.ui.ActionBar.AlertDialog;
@@ -55,14 +56,22 @@ public class MassgramUpdateManager {
     private static final String KEY_APK_URL = "apk_url";
     private static final String KEY_SHA256 = "sha256";
     private static final String KEY_APK_SIZE = "apk_size";
+    private static final String KEY_STABLE_CHANGELOG_HISTORY = "stable_changelog_history";
+    private static final String KEY_STABLE_CHANGELOG_LAST_CHECK_TIME = "stable_changelog_last_check_time";
     private static final long UPDATE_CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
+    private static final int MAX_CHANGELOG_ENTRIES = 10;
     private static final long[] BETA_TESTER_IDS = {8474618900L, 1339538506L, 6539627752L};
 
     private static volatile MassgramUpdateManager instance;
 
     private final EnumMap<Channel, ChannelState> states = new EnumMap<>(Channel.class);
+    private final Object stableChangelogLock = new Object();
+    private final ArrayList<Runnable> stableChangelogCallbacks = new ArrayList<>();
     private BroadcastReceiver downloadReceiver;
     private boolean receiverRegistered;
+    private volatile ArrayList<ChangelogEntry> stableChangelogEntries;
+    private volatile boolean checkingStableChangelog;
+    private volatile String lastStableChangelogError;
 
     public static MassgramUpdateManager getInstance() {
         MassgramUpdateManager localInstance = instance;
@@ -85,6 +94,7 @@ public class MassgramUpdateManager {
     public void initialize() {
         restorePersistedUpdate(Channel.STABLE);
         restorePersistedUpdate(Channel.BETA);
+        restorePersistedStableChangelog();
         ensureDownloadReceiver();
     }
 
@@ -100,6 +110,10 @@ public class MassgramUpdateManager {
         return isConfigured(Channel.BETA);
     }
 
+    public boolean isStableChangelogConfigured() {
+        return !TextUtils.isEmpty(BuildConfig.MASSGRAM_CHANGELOG_URL);
+    }
+
     public boolean isBetaTester(long userId) {
         for (int i = 0; i < BETA_TESTER_IDS.length; i++) {
             if (BETA_TESTER_IDS[i] == userId) {
@@ -107,6 +121,81 @@ public class MassgramUpdateManager {
             }
         }
         return false;
+    }
+
+    @Nullable
+    public ArrayList<ChangelogEntry> getStableChangelogEntries() {
+        if (stableChangelogEntries == null) {
+            restorePersistedStableChangelog();
+        }
+        if (stableChangelogEntries == null) {
+            return null;
+        }
+        return new ArrayList<>(stableChangelogEntries);
+    }
+
+    @Nullable
+    public String getLastStableChangelogError() {
+        return lastStableChangelogError;
+    }
+
+    public void checkStableChangelog(boolean force, @Nullable Runnable whenDone) {
+        if (!isStableChangelogConfigured()) {
+            lastStableChangelogError = LocaleController.getString(R.string.MassgramChangelogSourceNotConfigured);
+            if (whenDone != null) {
+                whenDone.run();
+            }
+            return;
+        }
+        final long now = System.currentTimeMillis();
+        synchronized (stableChangelogLock) {
+            if (whenDone != null) {
+                stableChangelogCallbacks.add(whenDone);
+            }
+            if (checkingStableChangelog) {
+                return;
+            }
+            if (!force) {
+                if (stableChangelogEntries == null) {
+                    restorePersistedStableChangelog();
+                }
+                long lastCheckTime = getPreferences().getLong(KEY_STABLE_CHANGELOG_LAST_CHECK_TIME, 0L);
+                if (stableChangelogEntries != null && now - lastCheckTime < UPDATE_CHECK_INTERVAL_MS) {
+                    runPendingStableChangelogCallbacks();
+                    return;
+                }
+            }
+            checkingStableChangelog = true;
+        }
+
+        Utilities.globalQueue.postRunnable(() -> {
+            ArrayList<ChangelogEntry> entries = null;
+            String errorMessage = null;
+            try {
+                entries = fetchStableChangelog();
+            } catch (Exception e) {
+                FileLog.e(e);
+                errorMessage = LocaleController.getString(R.string.MassgramChangelogLoadFailed);
+            }
+
+            final ArrayList<ChangelogEntry> fetchedEntries = entries;
+            final String fetchedError = errorMessage;
+            AndroidUtilities.runOnUIThread(() -> {
+                try {
+                    if (fetchedError == null) {
+                        lastStableChangelogError = null;
+                        applyFetchedStableChangelog(fetchedEntries, now);
+                    } else {
+                        lastStableChangelogError = fetchedError;
+                    }
+                } finally {
+                    synchronized (stableChangelogLock) {
+                        checkingStableChangelog = false;
+                    }
+                    runPendingStableChangelogCallbacks();
+                }
+            });
+        });
     }
 
     @Nullable
@@ -432,6 +521,70 @@ public class MassgramUpdateManager {
         }
     }
 
+    private void applyFetchedStableChangelog(@Nullable ArrayList<ChangelogEntry> entries, long checkedAt) {
+        stableChangelogEntries = entries == null ? new ArrayList<>() : entries;
+        persistStableChangelog(stableChangelogEntries, checkedAt);
+    }
+
+    @Nullable
+    private ArrayList<ChangelogEntry> fetchStableChangelog() throws Exception {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(getStableChangelogUrl()).openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(15000);
+            connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setUseCaches(false);
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode < 200 || responseCode >= 300) {
+                throw new IllegalStateException("Stable changelog HTTP " + responseCode);
+            }
+            return parseStableChangelogEntries(readStream(connection.getInputStream()));
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private ArrayList<ChangelogEntry> parseStableChangelogEntries(String response) throws Exception {
+        ArrayList<ChangelogEntry> entries = new ArrayList<>();
+        if (TextUtils.isEmpty(response)) {
+            return entries;
+        }
+        String trimmed = response.trim();
+        JSONArray releases;
+        if (trimmed.startsWith("{")) {
+            JSONObject root = new JSONObject(trimmed);
+            releases = root.optJSONArray("releases");
+        } else {
+            releases = new JSONArray(trimmed);
+        }
+        if (releases == null) {
+            return entries;
+        }
+        for (int i = 0; i < releases.length() && entries.size() < MAX_CHANGELOG_ENTRIES; i++) {
+            JSONObject item = releases.optJSONObject(i);
+            if (item == null) {
+                continue;
+            }
+            String versionName = item.optString("versionName", null);
+            int versionCode = item.optInt("versionCode", 0);
+            if (TextUtils.isEmpty(versionName) || versionCode <= 0) {
+                continue;
+            }
+            entries.add(new ChangelogEntry(
+                versionName,
+                versionCode,
+                item.optString("publishedAt", null),
+                item.optString("changelog", null)
+            ));
+        }
+        return entries;
+    }
+
     private void restorePersistedUpdate(Channel channel) {
         ChannelState state = getState(channel);
         SharedPreferences preferences = getPreferences();
@@ -459,6 +612,50 @@ public class MassgramUpdateManager {
             .putString(channelKey(channel, KEY_SHA256), update.sha256)
             .putLong(channelKey(channel, KEY_APK_SIZE), update.apkSize)
             .apply();
+    }
+
+    private void restorePersistedStableChangelog() {
+        SharedPreferences preferences = getPreferences();
+        String serialized = preferences.getString(KEY_STABLE_CHANGELOG_HISTORY, null);
+        if (TextUtils.isEmpty(serialized)) {
+            stableChangelogEntries = null;
+            return;
+        }
+        try {
+            stableChangelogEntries = parseStableChangelogEntries(serialized);
+        } catch (Exception e) {
+            FileLog.e(e);
+            stableChangelogEntries = null;
+            preferences.edit()
+                .remove(KEY_STABLE_CHANGELOG_HISTORY)
+                .remove(KEY_STABLE_CHANGELOG_LAST_CHECK_TIME)
+                .apply();
+        }
+    }
+
+    private void persistStableChangelog(ArrayList<ChangelogEntry> entries, long checkedAt) {
+        getPreferences().edit()
+            .putLong(KEY_STABLE_CHANGELOG_LAST_CHECK_TIME, checkedAt)
+            .putString(KEY_STABLE_CHANGELOG_HISTORY, serializeStableChangelog(entries))
+            .apply();
+    }
+
+    private String serializeStableChangelog(ArrayList<ChangelogEntry> entries) {
+        JSONArray releases = new JSONArray();
+        for (int i = 0; i < entries.size() && i < MAX_CHANGELOG_ENTRIES; i++) {
+            ChangelogEntry entry = entries.get(i);
+            JSONObject object = new JSONObject();
+            try {
+                object.put("versionName", entry.versionName);
+                object.put("versionCode", entry.versionCode);
+                object.put("publishedAt", entry.publishedAt);
+                object.put("changelog", entry.changelog);
+                releases.put(object);
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+        return releases.toString();
     }
 
     private void clearPersistedUpdate(Channel channel, boolean keepDownloadId) {
@@ -619,6 +816,20 @@ public class MassgramUpdateManager {
         }
     }
 
+    private void runPendingStableChangelogCallbacks() {
+        ArrayList<Runnable> callbacks;
+        synchronized (stableChangelogLock) {
+            callbacks = new ArrayList<>(stableChangelogCallbacks);
+            stableChangelogCallbacks.clear();
+        }
+        for (int i = 0; i < callbacks.size(); i++) {
+            Runnable callback = callbacks.get(i);
+            if (callback != null) {
+                callback.run();
+            }
+        }
+    }
+
     private String buildUpdateMessage(Channel channel, MassgramUpdateInfo update) {
         StringBuilder builder = new StringBuilder();
         if (update.apkSize > 0) {
@@ -695,6 +906,10 @@ public class MassgramUpdateManager {
         return channel == Channel.BETA ? BuildConfig.MASSGRAM_BETA_UPDATE_URL : BuildConfig.MASSGRAM_UPDATE_URL;
     }
 
+    private String getStableChangelogUrl() {
+        return BuildConfig.MASSGRAM_CHANGELOG_URL;
+    }
+
     private String channelKey(Channel channel, String key) {
         return channel.key + "_" + key;
     }
@@ -711,5 +926,21 @@ public class MassgramUpdateManager {
         int status;
         long downloadedBytes;
         long totalBytes;
+    }
+
+    public static final class ChangelogEntry {
+        public final String versionName;
+        public final int versionCode;
+        @Nullable
+        public final String publishedAt;
+        @Nullable
+        public final String changelog;
+
+        private ChangelogEntry(String versionName, int versionCode, @Nullable String publishedAt, @Nullable String changelog) {
+            this.versionName = versionName;
+            this.versionCode = versionCode;
+            this.publishedAt = publishedAt;
+            this.changelog = changelog;
+        }
     }
 }

@@ -2297,6 +2297,13 @@
     <string name="MassgramDisableLocalStatsInfo">Stops collecting local traffic and media counters inside Massgram. Existing saved counters remain unchanged.</string>
     <string name="MassgramCheckUpdates">Check for updates</string>
     <string name="MassgramCurrentVersion">Current version: %1$s</string>
+    <string name="MassgramChangelogAction">Changelog</string>
+    <string name="MassgramChangelogTitle">What\'s new in Massgram</string>
+    <string name="MassgramChangelogInfo">Recent changes from the stable release channel.</string>
+    <string name="MassgramChangelogLoadFailed">Massgram could not load release notes right now.</string>
+    <string name="MassgramChangelogSourceNotConfigured">Massgram changelog source is not configured yet.</string>
+    <string name="MassgramChangelogEmpty">No changelog entries are available yet.</string>
+    <string name="MassgramChangelogEmptyEntry">Release notes were not provided for this build.</string>
     <string name="MassgramUpdateSourceNotConfigured">Massgram update source is not configured yet.</string>
     <string name="MassgramUpdateCheckFailed">Massgram could not check for updates right now.</string>
     <string name="MassgramUpdateDownloadFailed">Massgram could not download the update package.</string>

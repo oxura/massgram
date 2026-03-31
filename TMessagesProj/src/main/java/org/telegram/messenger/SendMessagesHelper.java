@@ -3200,6 +3200,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 message = encryptedMessage;
                 searchLinks = false;
                 entities = null;
+            } else if (cryptoManager.supportsDialog(dialogId) && !TextUtils.isEmpty(message)) {
+                message = cryptoManager.appendCapabilityMarker(dialogId, message);
             }
         }
 
@@ -3925,6 +3927,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     mediaWebPage = null;
                     entities = null;
                 }
+            } else if (!TextUtils.isEmpty(message)) {
+                message = cryptoManager.appendCapabilityMarker(peer, message);
             }
         }
 

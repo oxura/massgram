@@ -15,6 +15,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.core.graphics.ColorUtils;
@@ -33,14 +34,20 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.BulletinFactory;
+import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Switch;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalFragment;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class MassgramSettingsActivity extends UniversalFragment {
 
@@ -290,8 +297,10 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 LocaleController.getString(R.string.MassgramCheckUpdates),
                 LocaleController.formatString("MassgramCurrentVersion", R.string.MassgramCurrentVersion, BuildVars.BUILD_VERSION_STRING),
                 LocaleController.getString(R.string.Update),
+                LocaleController.getString(R.string.MassgramChangelogAction),
                 betaUpdateRow == null && ownerStatsRow == null,
-                this::checkForUpdates
+                this::checkForUpdates,
+                this::showStableChangelog
             );
         }
         if (betaUpdateRow != null) {
@@ -427,6 +436,141 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.MassgramBetaYourVersionIsLatest)).show();
             }
         });
+    }
+
+    private void showStableChangelog() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        if (!ApplicationLoader.applicationLoaderInstance.hasStableChangelogConfig()) {
+            BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.MassgramChangelogSourceNotConfigured)).show();
+            return;
+        }
+        ApplicationLoader.applicationLoaderInstance.checkStableChangelog(true, () -> {
+            if (getParentActivity() == null) {
+                return;
+            }
+            ArrayList<ApplicationLoader.ChangelogEntry> entries = ApplicationLoader.applicationLoaderInstance.getStableChangelogEntries();
+            String error = ApplicationLoader.applicationLoaderInstance.getLastStableChangelogError();
+            if (!TextUtils.isEmpty(error) && (entries == null || entries.isEmpty())) {
+                BulletinFactory.of(this).createErrorBulletin(error).show();
+                return;
+            }
+            if (entries == null || entries.isEmpty()) {
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.MassgramChangelogEmpty)).show();
+                return;
+            }
+            showStableChangelogSheet(entries);
+        });
+    }
+
+    private void showStableChangelogSheet(ArrayList<ApplicationLoader.ChangelogEntry> entries) {
+        if (getParentActivity() == null) {
+            return;
+        }
+        BottomSheet.Builder builder = new BottomSheet.Builder(getParentActivity(), false, getResourceProvider());
+        builder.setApplyTopPadding(false);
+        builder.setApplyBottomPadding(false);
+
+        LinearLayout container = new LinearLayout(getParentActivity());
+        container.setOrientation(LinearLayout.VERTICAL);
+
+        HeaderCell headerCell = new HeaderCell(getParentActivity(), getResourceProvider());
+        headerCell.setText(LocaleController.getString(R.string.MassgramChangelogTitle));
+        container.addView(headerCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView infoView = new TextView(getParentActivity());
+        infoView.setText(LocaleController.getString(R.string.MassgramChangelogInfo));
+        infoView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2));
+        infoView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        infoView.setPadding(dp(18), 0, dp(18), dp(10));
+        container.addView(infoView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        ScrollView scrollView = new ScrollView(getParentActivity());
+        scrollView.setVerticalScrollBarEnabled(false);
+        LinearLayout entriesLayout = new LinearLayout(getParentActivity());
+        entriesLayout.setOrientation(LinearLayout.VERTICAL);
+        scrollView.addView(entriesLayout, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.FILL_HORIZONTAL));
+
+        for (int i = 0; i < entries.size(); i++) {
+            ApplicationLoader.ChangelogEntry entry = entries.get(i);
+            entriesLayout.addView(createChangelogEntryView(entry, i == entries.size() - 1), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        }
+
+        container.addView(scrollView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 8));
+        builder.setCustomView(container);
+
+        BottomSheet sheet = builder.create();
+        sheet.fixNavigationBar();
+        sheet.show();
+    }
+
+    private View createChangelogEntryView(ApplicationLoader.ChangelogEntry entry, boolean last) {
+        Context context = getParentActivity();
+        LinearLayout container = new LinearLayout(context);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(dp(18), dp(10), dp(18), dp(last ? 16 : 10));
+
+        LinearLayout topRow = new LinearLayout(context);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        container.addView(topRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        TextView versionView = new TextView(context);
+        versionView.setText(entry.versionName);
+        versionView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        versionView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        versionView.setTypeface(AndroidUtilities.bold());
+        topRow.addView(versionView, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+
+        TextView codeView = new TextView(context);
+        codeView.setText("#" + entry.versionCode);
+        codeView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText3));
+        codeView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        topRow.addView(codeView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL));
+
+        String publishedAt = formatChangelogDate(entry.publishedAt);
+        if (!TextUtils.isEmpty(publishedAt)) {
+            TextView dateView = new TextView(context);
+            dateView.setText(publishedAt);
+            dateView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText2));
+            dateView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            dateView.setPadding(0, dp(4), 0, 0);
+            container.addView(dateView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        }
+
+        TextView changelogView = new TextView(context);
+        changelogView.setText(!TextUtils.isEmpty(entry.changelog) ? entry.changelog : LocaleController.getString(R.string.MassgramChangelogEmptyEntry));
+        changelogView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
+        changelogView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        changelogView.setLineSpacing(dp(1.5f), 1f);
+        changelogView.setPadding(0, dp(8), 0, 0);
+        container.addView(changelogView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        if (!last) {
+            View divider = new View(context);
+            divider.setBackgroundColor(ColorUtils.setAlphaComponent(getThemedColor(Theme.key_divider), 140));
+            container.addView(divider, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 0, dp(14), 0, 0));
+        }
+        return container;
+    }
+
+    private String formatChangelogDate(String publishedAt) {
+        if (TextUtils.isEmpty(publishedAt)) {
+            return null;
+        }
+        try {
+            SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            parser.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date date = parser.parse(publishedAt);
+            if (date == null) {
+                return publishedAt;
+            }
+            SimpleDateFormat formatter = new SimpleDateFormat("d MMM yyyy", Locale.getDefault());
+            return formatter.format(date);
+        } catch (Exception ignore) {
+            return publishedAt;
+        }
     }
 
     private boolean isCurrentAccountBetaTester() {
@@ -709,9 +853,11 @@ public class MassgramSettingsActivity extends UniversalFragment {
         private final ImageView iconView;
         private final TextView titleView;
         private final TextView subtitleView;
+        private final TextView secondaryActionView;
         private final TextView actionView;
         private final View divider;
         private Runnable onActionClick;
+        private Runnable onSecondaryActionClick;
 
         private MassgramActionRow(Context context, int iconRes) {
             super(context);
@@ -757,6 +903,15 @@ public class MassgramSettingsActivity extends UniversalFragment {
             actionWrap.setGravity(Gravity.CENTER_VERTICAL);
             row.addView(actionWrap, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
+            secondaryActionView = new TextView(context);
+            secondaryActionView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
+            secondaryActionView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            secondaryActionView.setTypeface(AndroidUtilities.bold());
+            secondaryActionView.setPadding(dp(10), dp(6), dp(10), dp(6));
+            secondaryActionView.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(15), ColorUtils.setAlphaComponent(getThemedColor(Theme.key_windowBackgroundWhiteBlueText), 20), ColorUtils.setAlphaComponent(getThemedColor(Theme.key_windowBackgroundWhiteBlueText), 34)));
+            secondaryActionView.setVisibility(GONE);
+            actionWrap.addView(secondaryActionView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 8, 0));
+
             actionView = new TextView(context);
             actionView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
             actionView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -777,13 +932,29 @@ public class MassgramSettingsActivity extends UniversalFragment {
                     onActionClick.run();
                 }
             });
+            secondaryActionView.setOnClickListener(v -> {
+                if (onSecondaryActionClick != null && isEnabled()) {
+                    onSecondaryActionClick.run();
+                }
+            });
         }
 
         private void bind(int id, CharSequence title, CharSequence subtitle, CharSequence action, boolean last, Runnable onClick) {
+            bind(id, title, subtitle, action, null, last, onClick, null);
+        }
+
+        private void bind(int id, CharSequence title, CharSequence subtitle, CharSequence action, CharSequence secondaryAction, boolean last, Runnable onClick, Runnable onSecondaryClick) {
             setTag(id);
             titleView.setText(title);
             subtitleView.setText(subtitle);
             actionView.setText(action);
+            onSecondaryActionClick = onSecondaryClick;
+            if (!TextUtils.isEmpty(secondaryAction) && onSecondaryClick != null) {
+                secondaryActionView.setText(secondaryAction);
+                secondaryActionView.setVisibility(VISIBLE);
+            } else {
+                secondaryActionView.setVisibility(GONE);
+            }
             divider.setVisibility(last ? View.GONE : View.VISIBLE);
             onActionClick = onClick;
         }

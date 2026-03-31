@@ -46,6 +46,7 @@ import org.telegram.ui.IUpdateLayout;
 import org.telegram.ui.LauncherIconController;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Locale;
 
 public class ApplicationLoader extends Application {
@@ -685,10 +686,27 @@ public class ApplicationLoader extends Application {
         return null;
     }
 
+    public static class ChangelogEntry {
+        public final String versionName;
+        public final int versionCode;
+        public final String publishedAt;
+        public final String changelog;
+
+        public ChangelogEntry(String versionName, int versionCode, String publishedAt, String changelog) {
+            this.versionName = versionName;
+            this.versionCode = versionCode;
+            this.publishedAt = publishedAt;
+            this.changelog = changelog;
+        }
+    }
+
     public boolean isCustomUpdate() {
         return false;
     }
     public boolean hasCustomUpdateConfig() {
+        return false;
+    }
+    public boolean hasStableChangelogConfig() {
         return false;
     }
     public boolean hasCustomBetaUpdateConfig() {
@@ -710,6 +728,13 @@ public class ApplicationLoader extends Application {
         return null;
     }
     public String getLastUpdateError() {
+        return null;
+    }
+    public void checkStableChangelog(boolean force, Runnable whenDone) {}
+    public ArrayList<ChangelogEntry> getStableChangelogEntries() {
+        return null;
+    }
+    public String getLastStableChangelogError() {
         return null;
     }
     public void checkBetaUpdate(boolean force, Runnable whenDone) {}

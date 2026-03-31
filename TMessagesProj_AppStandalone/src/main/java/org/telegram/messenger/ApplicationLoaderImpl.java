@@ -32,6 +32,7 @@ import org.telegram.ui.SMSStatsActivity;
 import org.telegram.ui.SMSSubscribeSheet;
 
 import java.io.File;
+import java.util.ArrayList;
 
 public class ApplicationLoaderImpl extends ApplicationLoader {
     @Override
@@ -130,6 +131,11 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
     }
 
     @Override
+    public boolean hasStableChangelogConfig() {
+        return MassgramUpdateManager.getInstance().isStableChangelogConfigured();
+    }
+
+    @Override
     public boolean hasCustomBetaUpdateConfig() {
         return MassgramUpdateManager.getInstance().isBetaConfigured();
     }
@@ -172,6 +178,30 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
     @Override
     public String getLastUpdateError() {
         return MassgramUpdateManager.getInstance().getLastUpdateError();
+    }
+
+    @Override
+    public void checkStableChangelog(boolean force, Runnable whenDone) {
+        MassgramUpdateManager.getInstance().checkStableChangelog(force, whenDone);
+    }
+
+    @Override
+    public ArrayList<ChangelogEntry> getStableChangelogEntries() {
+        ArrayList<MassgramUpdateManager.ChangelogEntry> sourceEntries = MassgramUpdateManager.getInstance().getStableChangelogEntries();
+        if (sourceEntries == null) {
+            return null;
+        }
+        ArrayList<ChangelogEntry> result = new ArrayList<>(sourceEntries.size());
+        for (int i = 0; i < sourceEntries.size(); i++) {
+            MassgramUpdateManager.ChangelogEntry entry = sourceEntries.get(i);
+            result.add(new ChangelogEntry(entry.versionName, entry.versionCode, entry.publishedAt, entry.changelog));
+        }
+        return result;
+    }
+
+    @Override
+    public String getLastStableChangelogError() {
+        return MassgramUpdateManager.getInstance().getLastStableChangelogError();
     }
 
     @Override

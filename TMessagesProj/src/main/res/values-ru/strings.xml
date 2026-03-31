@@ -286,6 +286,13 @@
     <string name="MassgramDisableLocalStatsInfo">Перестаёт собирать внутри Massgram локальные счётчики трафика и медиа. Уже сохранённые данные не очищаются.</string>
     <string name="MassgramCheckUpdates">Проверить обновления</string>
     <string name="MassgramCurrentVersion">Текущая версия: %1$s</string>
+    <string name="MassgramChangelogAction">История</string>
+    <string name="MassgramChangelogTitle">Что нового в Massgram</string>
+    <string name="MassgramChangelogInfo">Последние изменения stable-канала Massgram.</string>
+    <string name="MassgramChangelogLoadFailed">Massgram не смог загрузить список изменений прямо сейчас.</string>
+    <string name="MassgramChangelogSourceNotConfigured">Источник списка изменений Massgram ещё не настроен.</string>
+    <string name="MassgramChangelogEmpty">История изменений пока недоступна.</string>
+    <string name="MassgramChangelogEmptyEntry">Для этой сборки список изменений не указан.</string>
     <string name="MassgramUpdateSourceNotConfigured">Источник обновлений Massgram ещё не настроен.</string>
     <string name="MassgramUpdateCheckFailed">Massgram не смог проверить обновления сейчас.</string>
     <string name="MassgramUpdateDownloadFailed">Massgram не смог скачать пакет обновления.</string>

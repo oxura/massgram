@@ -2780,6 +2780,12 @@ public class ChatActivityEnterView extends FrameLayout implements
             }
 
             @Override
+            protected void dispatchDraw(Canvas canvas) {
+                syncMassgramVoicePitchButtonPresentation();
+                super.dispatchDraw(canvas);
+            }
+
+            @Override
             public boolean dispatchTouchEvent(MotionEvent ev) {
                 if (!sendButtonEnabled) {
                     return false;
@@ -3085,7 +3091,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         voicePitchButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
         voicePitchButton.setContentDescription(getString(R.string.MassgramVoicePitchTitle));
         voicePitchButton.setOnClickListener(v -> showMassgramVoicePitchSheet());
-        sendButtonContainer.addView(voicePitchButton, LayoutHelper.createFrame(40, 40, Gravity.LEFT | Gravity.BOTTOM, 6, 0, 0, 4));
+        sendButtonContainer.addView(voicePitchButton, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 4, 52));
         updateMassgramVoicePitchButtonState();
 
 //        audioVideoButtonContainer.setOnTouchListener((view, motionEvent) -> {
@@ -5829,6 +5835,16 @@ public class ChatActivityEnterView extends FrameLayout implements
     }
 
     private void updateMassgramVoicePitchButtonState() {
+        syncMassgramVoicePitchButtonPresentation();
+        if (voicePitchButton == null) {
+            return;
+        }
+        boolean enabled = MassgramConfigManager.getInstance().isVoicePitchEnabled() && MassgramConfigManager.getInstance().getVoicePitchSemitones() != 0;
+        int iconColor = enabled ? getThemedColor(Theme.key_chat_messagePanelSend) : getThemedColor(Theme.key_chat_messagePanelIcons);
+        voicePitchButton.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.MULTIPLY));
+    }
+
+    private void syncMassgramVoicePitchButtonPresentation() {
         if (voicePitchButton == null) {
             return;
         }
@@ -5839,10 +5855,19 @@ public class ChatActivityEnterView extends FrameLayout implements
             && !isLiveComment
             && sendVoiceEnabled;
         voicePitchButton.setVisibility(visible ? VISIBLE : GONE);
-        boolean enabled = MassgramConfigManager.getInstance().isVoicePitchEnabled() && MassgramConfigManager.getInstance().getVoicePitchSemitones() != 0;
-        int iconColor = enabled ? getThemedColor(Theme.key_chat_messagePanelSend) : getThemedColor(Theme.key_chat_messagePanelIcons);
-        voicePitchButton.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.MULTIPLY));
-        voicePitchButton.setAlpha(visible ? 1f : 0f);
+        if (audioVideoButtonContainer != null) {
+            voicePitchButton.setAlpha(visible ? audioVideoButtonContainer.getAlpha() : 0f);
+            voicePitchButton.setScaleX(audioVideoButtonContainer.getScaleX());
+            voicePitchButton.setScaleY(audioVideoButtonContainer.getScaleY());
+            voicePitchButton.setTranslationX(audioVideoButtonContainer.getTranslationX());
+            voicePitchButton.setTranslationY(audioVideoButtonContainer.getTranslationY());
+        } else {
+            voicePitchButton.setAlpha(visible ? 1f : 0f);
+            voicePitchButton.setScaleX(1f);
+            voicePitchButton.setScaleY(1f);
+            voicePitchButton.setTranslationX(0f);
+            voicePitchButton.setTranslationY(0f);
+        }
     }
 
     private void showMassgramVoicePitchSheet() {

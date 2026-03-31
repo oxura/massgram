@@ -21,6 +21,7 @@ public class MassgramCryptoManager {
 
     private static final String DEFAULT_DIALOG_KEY = "Batyi0015";
     private static final String PAYLOAD_PREFIX = "\uD83D\uDD12MG1:";
+    private static final String CAPABILITY_MARKER = "\u2063\u2060\u2062\u2063";
 
     private static final SparseArray<MassgramCryptoManager> instances = new SparseArray<>();
 
@@ -78,11 +79,35 @@ public class MassgramCryptoManager {
     }
 
     public boolean looksLikeEncryptedPayload(String text) {
-        return !TextUtils.isEmpty(text) && text.startsWith(PAYLOAD_PREFIX);
+        String sanitized = stripCapabilityMarker(text);
+        return !TextUtils.isEmpty(sanitized) && sanitized.startsWith(PAYLOAD_PREFIX);
+    }
+
+    public boolean containsCapabilityMarker(String text) {
+        return !TextUtils.isEmpty(text) && text.contains(CAPABILITY_MARKER);
+    }
+
+    public String appendCapabilityMarker(long dialogId, String text) {
+        if (!supportsDialog(dialogId) || TextUtils.isEmpty(text) || looksLikeEncryptedPayload(text)) {
+            return text;
+        }
+        String stripped = stripCapabilityMarker(text);
+        if (TextUtils.isEmpty(stripped)) {
+            return stripped;
+        }
+        return stripped + CAPABILITY_MARKER;
+    }
+
+    public String stripCapabilityMarker(String text) {
+        if (TextUtils.isEmpty(text) || !text.contains(CAPABILITY_MARKER)) {
+            return text;
+        }
+        return text.replace(CAPABILITY_MARKER, "");
     }
 
     public String encryptOutgoingText(long dialogId, String text) {
-        if (!supportsDialog(dialogId) || TextUtils.isEmpty(text) || looksLikeEncryptedPayload(text)) {
+        String visibleText = stripCapabilityMarker(text);
+        if (!supportsDialog(dialogId) || TextUtils.isEmpty(visibleText) || looksLikeEncryptedPayload(visibleText)) {
             return text;
         }
         try {
@@ -91,7 +116,7 @@ public class MassgramCryptoManager {
 
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             cipher.init(Cipher.ENCRYPT_MODE, buildSecretKey(getDialogKey(dialogId)), new IvParameterSpec(iv));
-            byte[] encrypted = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
+            byte[] encrypted = cipher.doFinal(visibleText.getBytes(StandardCharsets.UTF_8));
             byte[] payload = new byte[iv.length + encrypted.length];
             System.arraycopy(iv, 0, payload, 0, iv.length);
             System.arraycopy(encrypted, 0, payload, iv.length, encrypted.length);
@@ -103,13 +128,19 @@ public class MassgramCryptoManager {
     }
 
     public String getDisplayText(long dialogId, String text, boolean incoming) {
-        if (!supportsDialog(dialogId) || TextUtils.isEmpty(text) || !looksLikeEncryptedPayload(text)) {
-            return text;
+        boolean supportsDialog = supportsDialog(dialogId);
+        boolean hasCapabilityMarker = containsCapabilityMarker(text);
+        String sanitized = stripCapabilityMarker(text);
+        if (incoming && supportsDialog && hasCapabilityMarker) {
+            markPeerDetected(dialogId);
+        }
+        if (!supportsDialog || TextUtils.isEmpty(sanitized) || !looksLikeEncryptedPayload(sanitized)) {
+            return sanitized;
         }
         try {
-            byte[] payload = Base64.decode(text.substring(PAYLOAD_PREFIX.length()), Base64.DEFAULT);
+            byte[] payload = Base64.decode(sanitized.substring(PAYLOAD_PREFIX.length()), Base64.DEFAULT);
             if (payload.length <= 16) {
-                return text;
+                return sanitized;
             }
 
             byte[] iv = new byte[16];
@@ -125,7 +156,7 @@ public class MassgramCryptoManager {
             }
             return decrypted;
         } catch (Exception e) {
-            return text;
+            return sanitized;
         }
     }
 
