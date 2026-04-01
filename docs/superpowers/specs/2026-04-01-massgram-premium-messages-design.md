@@ -39,9 +39,9 @@ Replace global fake-Premium behavior with a Massgram-only message protocol that:
 Use a Massgram-specific text transport:
 
 - Visible text sent to Telegram: `Unsupported Massgram message`
-- Hidden payload appended using an invisible marker and encoded data
+- Hidden payload appended using an invisible marker and encoded data that should not be visually exposed in normal clients
 - Massgram clients detect the payload, suppress the placeholder, and render the decoded content locally
-- Official clients only see the placeholder text
+- Official clients only see the placeholder text `Unsupported Massgram message`
 
 This approach is intentionally boring and server-compatible. It does not require changing Telegram transport semantics or introducing new infrastructure.
 
@@ -69,8 +69,10 @@ Versioned payload format:
 Logical structure:
 
 ```text
-Unsupported Massgram message + [hidden marker] + MGP1:<type>:<base64-json>
+Unsupported Massgram message + [invisible marker + invisible encoded payload]
 ```
+
+The encoded protocol layout remains logically versioned as `MGP1:<type>:<base64-json>`, but that data is carried inside the hidden section and must not be user-visible in normal clients.
 
 Initial v1 payload types:
 
