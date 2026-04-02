@@ -496,8 +496,7 @@ public class ContentPreviewViewer {
                 containerView.invalidate();
             } else if (currentContentType == CONTENT_TYPE_STICKER) {
                 if (MessageObject.isPremiumSticker(currentDocument)
-                    && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()
-                    && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
+                    && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                     showUnlockPremiumView();
                     menuVisible = true;
                     containerView.invalidate();

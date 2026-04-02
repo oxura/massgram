@@ -32795,7 +32795,7 @@ public class ChatActivity extends BaseFragment implements
             }
             case OPTION_EDIT_TODO:
             case OPTION_ADD_TO_TODO: {
-                if (!getUserConfig().isPremium()) {
+                if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                     showDialog(new PremiumFeatureBottomSheet(ChatActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_TODO, false));
                 } else {
                     final MessageObject object = selectedObject;
@@ -34234,9 +34234,10 @@ public class ChatActivity extends BaseFragment implements
     public void sendTodo(TLRPC.TL_messageMediaToDo todo, boolean notify, int scheduleDate, long payStars) {
         if (checkSlowModeAlert()) {
             if (MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
-                String payloadMessage = MassgramPremiumMessageCodec.encodeText(buildMassgramTodoText(todo));
-                if (!TextUtils.isEmpty(payloadMessage)) {
-                    final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of(payloadMessage, dialog_id, replyingMessageObject, getThreadMessage(), null, false, null, null, null, notify, scheduleDate, 0, null, false);
+                String todoText = buildMassgramTodoText(todo);
+                if (!TextUtils.isEmpty(todoText)) {
+                    final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of(todoText, dialog_id, replyingMessageObject, getThreadMessage(), null, false, null, null, null, notify, scheduleDate, 0, null, false);
+                    params2.forceMassgramPremiumTextPayload = true;
                     params2.quick_reply_shortcut = quickReplyShortcut;
                     params2.quick_reply_shortcut_id = getQuickReplyId();
                     params2.payStars = payStars;
@@ -38933,7 +38934,7 @@ public class ChatActivity extends BaseFragment implements
                     .createSimpleBulletin(R.raw.passcode_lock_close, AndroidUtilities.replaceTags(formatString(R.string.TodoCompleteForbidden, DialogObject.getName(currentAccount, fromId))))
                     .show(true);
                 return false;
-            } else if (!getUserConfig().isPremium()) {
+            } else if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                 BulletinFactory.of(ChatActivity.this)
                     .createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.premiumText(getString(R.string.TodoPremiumRequired), () -> {
                         showDialog(new PremiumFeatureBottomSheet(ChatActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_TODO, false));

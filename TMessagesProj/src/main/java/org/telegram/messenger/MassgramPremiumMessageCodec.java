@@ -4,7 +4,10 @@ import org.telegram.tgnet.SerializedData;
 import org.telegram.tgnet.TLRPC;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class MassgramPremiumMessageCodec {
 
@@ -17,16 +20,29 @@ public final class MassgramPremiumMessageCodec {
     private static final String TEXT_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_TEXT + ":";
     private static final String STICKER_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_STICKER + ":";
     private static final char[] INVISIBLE_ALPHABET = {'\u2060', '\u2061', '\u2062', '\u2063'};
+    private static final Pattern CUSTOM_EMOJI_ENTITY_PATTERN = Pattern.compile("\\{\"type\":\"custom_emoji\",\"offset\":(-?\\d+),\"length\":(\\d+),\"document_id\":(\\d+)\\}");
 
     private MassgramPremiumMessageCodec() {
     }
 
     public static String encodeText(String text) {
+        return encodeText(text, null);
+    }
+
+    public static String encodeText(String text, ArrayList<TLRPC.MessageEntity> entities) {
         if (text == null || text.isEmpty()) {
             return null;
         }
-        String json = "{\"text\":\"" + escapeJson(text) + "\",\"format\":\"plain\"}";
-        return wrapProtocol(TEXT_PROTOCOL_PREFIX + Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8)));
+        StringBuilder json = new StringBuilder(text.length() + 64);
+        json.append("{\"text\":\"")
+            .append(escapeJson(text))
+            .append("\",\"format\":\"plain\"");
+        String encodedEntities = encodeTextEntities(entities);
+        if (encodedEntities != null) {
+            json.append(",\"entities\":[").append(encodedEntities).append(']');
+        }
+        json.append('}');
+        return wrapProtocol(TEXT_PROTOCOL_PREFIX + Base64.getEncoder().encodeToString(json.toString().getBytes(StandardCharsets.UTF_8)));
     }
 
     public static String encodeSticker(TLRPC.Document document) {
@@ -78,15 +94,17 @@ public final class MassgramPremiumMessageCodec {
                 return null;
             }
             String decodedText;
+            ArrayList<TLRPC.MessageEntity> decodedEntities;
             try {
                 decodedText = extractJsonString(json, "text");
+                decodedEntities = decodeTextEntities(json);
             } catch (RuntimeException ignore) {
                 return null;
             }
             if (decodedText == null || decodedText.isEmpty()) {
                 return null;
             }
-            return new DecodedPayload(TYPE_PREMIUM_TEXT, decodedText, null);
+            return new DecodedPayload(TYPE_PREMIUM_TEXT, decodedText, null, decodedEntities);
         }
         if (protocol.startsWith(STICKER_PROTOCOL_PREFIX)) {
             String base64Document = protocol.substring(STICKER_PROTOCOL_PREFIX.length());
@@ -100,7 +118,7 @@ public final class MassgramPremiumMessageCodec {
             if (document == null) {
                 return null;
             }
-            return new DecodedPayload(TYPE_PREMIUM_STICKER, null, document);
+            return new DecodedPayload(TYPE_PREMIUM_STICKER, null, document, null);
         }
         return null;
     }
@@ -142,6 +160,57 @@ public final class MassgramPremiumMessageCodec {
             }
         }
         return -1;
+    }
+
+    private static String encodeTextEntities(ArrayList<TLRPC.MessageEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < entities.size(); i++) {
+            TLRPC.MessageEntity entity = entities.get(i);
+            if (!(entity instanceof TLRPC.TL_messageEntityCustomEmoji)) {
+                continue;
+            }
+            TLRPC.TL_messageEntityCustomEmoji customEmoji = (TLRPC.TL_messageEntityCustomEmoji) entity;
+            if (customEmoji.length <= 0 || customEmoji.document_id == 0) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(',');
+            }
+            builder.append("{\"type\":\"custom_emoji\",\"offset\":")
+                .append(customEmoji.offset)
+                .append(",\"length\":")
+                .append(customEmoji.length)
+                .append(",\"document_id\":")
+                .append(customEmoji.document_id)
+                .append('}');
+        }
+        return builder.length() > 0 ? builder.toString() : null;
+    }
+
+    private static ArrayList<TLRPC.MessageEntity> decodeTextEntities(String json) {
+        if (json == null || json.indexOf("\"entities\":[") < 0) {
+            return null;
+        }
+        ArrayList<TLRPC.MessageEntity> entities = new ArrayList<>();
+        Matcher matcher = CUSTOM_EMOJI_ENTITY_PATTERN.matcher(json);
+        while (matcher.find()) {
+            long documentId = Long.parseLong(matcher.group(3));
+            int offset = Integer.parseInt(matcher.group(1));
+            int length = Integer.parseInt(matcher.group(2));
+            TLRPC.TL_messageEntityCustomEmoji customEmoji = new TLRPC.TL_messageEntityCustomEmoji();
+            customEmoji.document_id = documentId;
+            customEmoji.offset = offset;
+            customEmoji.length = length;
+            entities.add(customEmoji);
+        }
+        return entities.isEmpty() ? null : entities;
+    }
+
+    private static String wrapProtocol(String protocol) {
+        return PLACEHOLDER_TEXT + MARKER + encodeInvisible(protocol.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String escapeJson(String value) {
@@ -230,10 +299,6 @@ public final class MassgramPremiumMessageCodec {
         return null;
     }
 
-    private static String wrapProtocol(String protocol) {
-        return PLACEHOLDER_TEXT + MARKER + encodeInvisible(protocol.getBytes(StandardCharsets.UTF_8));
-    }
-
     private static byte[] serializeDocument(TLRPC.Document document) {
         try {
             TLRPC.TL_document payloadDocument = new TLRPC.TL_document();
@@ -293,11 +358,13 @@ public final class MassgramPremiumMessageCodec {
         public final String type;
         public final String text;
         public final TLRPC.Document document;
+        public final ArrayList<TLRPC.MessageEntity> entities;
 
-        public DecodedPayload(String type, String text, TLRPC.Document document) {
+        public DecodedPayload(String type, String text, TLRPC.Document document, ArrayList<TLRPC.MessageEntity> entities) {
             this.type = type;
             this.text = text;
             this.document = document;
+            this.entities = entities;
         }
     }
 }

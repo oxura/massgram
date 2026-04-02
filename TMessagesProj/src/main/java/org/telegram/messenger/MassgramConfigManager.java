@@ -102,6 +102,13 @@ public class MassgramConfigManager {
         return getPreferences().getBoolean(KEY_PREMIUM_UNLOCK, false);
     }
 
+    public boolean canUsePremiumFeatures(int currentAccount) {
+        return MassgramPremiumTransportPolicy.canUsePremiumFeatures(
+            UserConfig.getInstance(currentAccount).isPremium(),
+            isPremiumUnlockEnabled()
+        );
+    }
+
     public void setPremiumUnlockEnabled(boolean enabled) {
         SharedPreferences preferences = getPreferences();
         if (preferences.getBoolean(KEY_PREMIUM_UNLOCK, false) == enabled) {

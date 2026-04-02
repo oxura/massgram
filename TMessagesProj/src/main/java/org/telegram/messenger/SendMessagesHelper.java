@@ -67,6 +67,7 @@ import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiSpan;
+import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AnimatedFileDrawable;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.OAuthSheet;
@@ -3185,11 +3186,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         return GhostModeManager.getInstance().shouldDisableLocalLinkPreviews();
     }
 
-    private boolean shouldSendMassgramPremiumText(MessageObject retryMessageObject, String message) {
+    private boolean shouldSendMassgramPremiumText(boolean forceMassgramPremiumTextPayload, MessageObject retryMessageObject, String message, ArrayList<TLRPC.MessageEntity> entities) {
         return retryMessageObject == null
-            && MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
-            && !TextUtils.isEmpty(message)
-            && !MassgramPremiumMessageCodec.hasPayload(message);
+            && (MassgramPremiumTransportPolicy.shouldEncodeNewTextAsPayload(forceMassgramPremiumTextPayload, message)
+                || shouldEncodeMassgramPremiumCustomEmojiPayload(message, entities));
     }
 
     private boolean shouldSendMassgramPremiumSticker(TLRPC.Document document, CharSequence caption, VideoEditedInfo videoEditedInfo, long peer) {
@@ -3219,12 +3219,52 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     private boolean shouldEncodeEditedMassgramPremiumText(MessageObject messageObject, String message) {
-        if (TextUtils.isEmpty(message)) {
-            return false;
+        String currentMessage = null;
+        if (messageObject != null && messageObject.messageOwner != null) {
+            currentMessage = MassgramCryptoManager.getInstance(currentAccount).resolveStoredMessageText(messageObject.getDialogId(), messageObject.messageOwner.message);
         }
-        String currentMessage = messageObject != null && messageObject.messageOwner != null ? messageObject.messageOwner.message : null;
-        return MassgramPremiumMessageCodec.hasPayload(currentMessage)
-            || shouldSendMassgramPremiumText(null, message);
+        return MassgramPremiumTransportPolicy.shouldEncodeEditedTextAsPayload(currentMessage, message);
+    }
+
+    private boolean shouldEncodeMassgramPremiumCustomEmojiPayload(String message, ArrayList<TLRPC.MessageEntity> entities) {
+        return !TextUtils.isEmpty(message) && getMassgramPremiumTextEntities(entities) != null;
+    }
+
+    private ArrayList<TLRPC.MessageEntity> getMassgramPremiumTextEntities(ArrayList<TLRPC.MessageEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return null;
+        }
+        ArrayList<TLRPC.MessageEntity> payloadEntities = null;
+        for (int i = 0; i < entities.size(); i++) {
+            TLRPC.MessageEntity entity = entities.get(i);
+            if (!(entity instanceof TLRPC.TL_messageEntityCustomEmoji)) {
+                continue;
+            }
+            TLRPC.TL_messageEntityCustomEmoji customEmoji = (TLRPC.TL_messageEntityCustomEmoji) entity;
+            long documentId = customEmoji.document_id;
+            TLRPC.Document document = customEmoji.document;
+            if (document == null && documentId != 0) {
+                document = AnimatedEmojiDrawable.findDocument(currentAccount, documentId);
+            }
+            if (document != null && MessageObject.isFreeEmoji(document)) {
+                continue;
+            }
+            if (documentId == 0 && document != null) {
+                documentId = document.id;
+            }
+            if (documentId == 0 || customEmoji.length <= 0) {
+                continue;
+            }
+            if (payloadEntities == null) {
+                payloadEntities = new ArrayList<>();
+            }
+            TLRPC.TL_messageEntityCustomEmoji payloadEntity = new TLRPC.TL_messageEntityCustomEmoji();
+            payloadEntity.offset = customEmoji.offset;
+            payloadEntity.length = customEmoji.length;
+            payloadEntity.document_id = documentId;
+            payloadEntities.add(payloadEntity);
+        }
+        return payloadEntities;
     }
 
     public int editMessage(MessageObject messageObject, String message, boolean searchLinks, final BaseFragment fragment, ArrayList<TLRPC.MessageEntity> entities, int scheduleDate, int scheduleRepeatPeriod) {
@@ -3238,16 +3278,28 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (message != null) {
             long dialogId = messageObject.getDialogId();
             MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+            ArrayList<TLRPC.MessageEntity> premiumTextEntities = getMassgramPremiumTextEntities(entities);
+            boolean shouldEncodePremiumPayload = shouldEncodeEditedMassgramPremiumText(messageObject, message)
+                || premiumTextEntities != null;
             if (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(messageObject.messageOwner != null ? messageObject.messageOwner.message : null)) {
-                String encryptedMessage = cryptoManager.encryptOutgoingText(dialogId, message);
+                String outgoingMessage = message;
+                if (shouldEncodePremiumPayload) {
+                    outgoingMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
+                    if (outgoingMessage == null) {
+                        return 0;
+                    }
+                    searchLinks = false;
+                    entities = null;
+                }
+                String encryptedMessage = cryptoManager.encryptOutgoingText(dialogId, outgoingMessage);
                 if (encryptedMessage == null) {
                     return 0;
                 }
                 message = encryptedMessage;
                 searchLinks = false;
                 entities = null;
-            } else if (shouldEncodeEditedMassgramPremiumText(messageObject, message)) {
-                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message);
+            } else if (shouldEncodePremiumPayload) {
+                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
                 if (payloadMessage == null) {
                     return 0;
                 }
@@ -3957,11 +4009,23 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         }
         if (retryMessageObject == null) {
             MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+            ArrayList<TLRPC.MessageEntity> premiumTextEntities = getMassgramPremiumTextEntities(entities);
             if (DialogObject.isUserDialog(peer)) {
                 if (cryptoManager.isEncryptionEnabled(peer)) {
                     boolean encryptedAnyText = false;
                     if (!TextUtils.isEmpty(message)) {
-                        String encryptedMessage = cryptoManager.encryptOutgoingText(peer, message);
+                        String messageToEncrypt = message;
+                        if (shouldSendMassgramPremiumText(sendMessageParams.forceMassgramPremiumTextPayload, retryMessageObject, message, entities)) {
+                            messageToEncrypt = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
+                            if (messageToEncrypt == null) {
+                                return;
+                            }
+                            searchLinks = false;
+                            webPage = null;
+                            mediaWebPage = null;
+                            entities = null;
+                        }
+                        String encryptedMessage = cryptoManager.encryptOutgoingText(peer, messageToEncrypt);
                         if (encryptedMessage == null) {
                             return;
                         }
@@ -3982,8 +4046,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         mediaWebPage = null;
                         entities = null;
                     }
-                } else if (shouldSendMassgramPremiumText(retryMessageObject, message)) {
-                    String payloadMessage = MassgramPremiumMessageCodec.encodeText(message);
+                } else if (shouldSendMassgramPremiumText(sendMessageParams.forceMassgramPremiumTextPayload, retryMessageObject, message, entities)) {
+                    String payloadMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
                     if (payloadMessage == null) {
                         return;
                     }
@@ -3995,8 +4059,8 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 } else if (!TextUtils.isEmpty(message)) {
                     message = cryptoManager.appendCapabilityMarker(peer, message);
                 }
-            } else if (!DialogObject.isEncryptedDialog(peer) && shouldSendMassgramPremiumText(retryMessageObject, message)) {
-                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message);
+            } else if (!DialogObject.isEncryptedDialog(peer) && shouldSendMassgramPremiumText(sendMessageParams.forceMassgramPremiumTextPayload, retryMessageObject, message, entities)) {
+                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
                 if (payloadMessage == null) {
                     return;
                 }
@@ -10661,6 +10725,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         public boolean sendingHighQuality;
         public MessageSuggestionParams suggestionParams;
         public long dice_stake;
+        public boolean forceMassgramPremiumTextPayload;
 
         public static SendMessageParams of(String string, long dialogId) {
             return of(string, null, null, null, null, null, null, null, null, null, dialogId, null, null, null, null, true, null, null, null, null, false, 0, 0, 0, null, null, false);

@@ -1366,7 +1366,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                 if (emoticon == null && document != null) {
                     emoticon = MessageObject.findAnimatedEmojiEmoticon(document);
                 }
-                if (!MessageObject.isFreeEmoji(document) && !UserConfig.getInstance(currentAccount).isPremium() && !(delegate != null && delegate.isUserSelf()) && !allowEmojisForNonPremium && !isGroupEmojis) {
+                if (!MessageObject.isFreeEmoji(document) && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) && !(delegate != null && delegate.isUserSelf()) && !allowEmojisForNonPremium && !isGroupEmojis) {
                     showBottomTab(false, true);
                     BulletinFactory factory = fragment != null ? BulletinFactory.of(fragment) : BulletinFactory.of(bulletinContainer, resourcesProvider);
                     if (premiumBulletin || fragment == null) {
@@ -2285,8 +2285,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                 StickerEmojiCell cell = (StickerEmojiCell) view;
                 if (cell.getSticker() != null
                     && MessageObject.isPremiumSticker(cell.getSticker())
-                    && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()
-                    && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
+                    && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                     ContentPreviewViewer.getInstance().showMenuFor(cell);
                     return;
                 }
@@ -3500,7 +3499,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                 }
                 clipBottom += AndroidUtilities.dp(6);
 
-                float lockT = premiumT.set(UserConfig.getInstance(currentAccount).isPremium() || allowEmojisForNonPremium ? 0f : 1f); // CubicBezierInterpolator.EASE_OUT_QUINT.getInterpolation(Math.min(now - appearTime, 550) / 550f);
+                float lockT = premiumT.set(MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) || allowEmojisForNonPremium ? 0f : 1f); // CubicBezierInterpolator.EASE_OUT_QUINT.getInterpolation(Math.min(now - appearTime, 550) / 550f);
 
                 int positionInGroup = childPosition - start;
                 float top;
@@ -4093,7 +4092,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
             }
             int state = BUTTON_STATE_EMPTY;
             boolean installed = pack.installed || installedEmojiSets.contains(pack.set.id);
-            if (!pack.free && !UserConfig.getInstance(currentAccount).isPremium() && !allowEmojisForNonPremium) {
+            if (!pack.free && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) && !allowEmojisForNonPremium) {
                 state = BUTTON_STATE_LOCKED;
             } else if (pack.featured) {
                 if (installed) {
@@ -4219,7 +4218,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                 outRect.left = AndroidUtilities.dp(5);
                 outRect.right = AndroidUtilities.dp(5);
                 int position = parent.getChildAdapterPosition(view);
-                if (position + 1 > emojiAdapter.plainEmojisCount && !UserConfig.getInstance(currentAccount).isPremium() && !allowEmojisForNonPremium) {
+                if (position + 1 > emojiAdapter.plainEmojisCount && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) && !allowEmojisForNonPremium) {
                     outRect.top = AndroidUtilities.dp(10);
                 }
             } else if (view instanceof RecyclerListView || view instanceof EmojiPackHeader) {
@@ -5475,7 +5474,9 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                 }
             }
         }
-        packs = MessagesController.getInstance(currentAccount).filterPremiumStickers(packs);
+        if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
+            packs = MessagesController.getInstance(currentAccount).filterPremiumStickers(packs);
+        }
         for (int a = 0; a < packs.size(); a++) {
             TLRPC.TL_messages_stickerSet pack = packs.get(a);
             if (pack.set != null && pack.set.archived || pack.documents == null || pack.documents.isEmpty()) {
@@ -6036,7 +6037,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
             int previousCount2 = favouriteStickers.size();
             recentStickers = MediaDataController.getInstance(currentAccount).getRecentStickers(MediaDataController.TYPE_IMAGE, true);
             favouriteStickers = MediaDataController.getInstance(currentAccount).getRecentStickers(MediaDataController.TYPE_FAVE);
-            if (UserConfig.getInstance(currentAccount).isPremium()) {
+            if (MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                 premiumStickers = MediaDataController.getInstance(currentAccount).getRecentStickers(MediaDataController.TYPE_PREMIUM_STICKERS);
             } else {
                 premiumStickers = new ArrayList<>();
@@ -6051,7 +6052,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                     }
                 }
             }
-            if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+            if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                 for (int a = 0; a < favouriteStickers.size(); a++) {
                     if (MessageObject.isPremiumSticker(favouriteStickers.get(a))) {
                         favouriteStickers.remove(a);
@@ -7191,7 +7192,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                             count += size;
                         }
                         if (code == null) {
-                            final boolean isPremium = UserConfig.getInstance(currentAccount).isPremium();
+                            final boolean isPremium = MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount);
                             final int maxlen = emojiLayoutManager.getSpanCount() * 3;
                             for (int b = 0; b < packStartPosition.size(); ++b) {
                                 EmojiPack pack = emojipacksProcessed.get(b);
@@ -7300,7 +7301,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                     int a = section - emojiTitles.length;
                     EmojiPack pack2 = emojipacksProcessed.get(a);
                     EmojiPack before = a - 1 >= 0 ? emojipacksProcessed.get(a - 1) : null;
-                    boolean divider = pack2 != null && pack2.featured && !(before != null && !before.free && before.installed && !UserConfig.getInstance(currentAccount).isPremium());
+                    boolean divider = pack2 != null && pack2.featured && !(before != null && !before.free && before.installed && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount));
                     if (pack2 != null && pack2.needLoadSet != null) {
                         MediaDataController.getInstance(currentAccount).getStickerSet(pack2.needLoadSet, false);
                         pack2.needLoadSet = null;
@@ -7349,7 +7350,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                 frozenEmojiPacks = new ArrayList<>(mediaDataController.getStickerSets(MediaDataController.TYPE_EMOJIPACKS));
             }
             ArrayList<TLRPC.TL_messages_stickerSet> installedEmojipacks = frozenEmojiPacks;
-            boolean isPremium = UserConfig.getInstance(currentAccount).isPremium() || allowEmojisForNonPremium;
+            boolean isPremium = MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) || allowEmojisForNonPremium;
             int index = 0;
 
             if (info != null && info.emojiset != null) {
@@ -7490,7 +7491,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
             int start = packStartPosition.get(index);
             expandedEmojiSets.add(pack.set.id);
 
-            boolean isPremium = UserConfig.getInstance(currentAccount).isPremium() || allowEmojisForNonPremium;
+            boolean isPremium = MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) || allowEmojisForNonPremium;
             int maxlen = emojiLayoutManager.getSpanCount() * 3;
             int fromCount = ((pack.installed && !pack.featured) && (pack.free || isPremium) || pack.expanded ? pack.documents.size() : Math.min(maxlen, pack.documents.size()));
             Integer from = null, count = null;
@@ -7541,7 +7542,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
             packStartPosition.clear();
             rowHashCodes.clear();
             itemCount = 0;
-            boolean isPremium = UserConfig.getInstance(currentAccount).isPremium() || allowEmojisForNonPremium;
+            boolean isPremium = MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) || allowEmojisForNonPremium;
             if (needEmojiSearch) {
                 itemCount++;
                 rowHashCodes.add(-1);
@@ -7969,7 +7970,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                                     searchResult.addAll(param);
 
                                     next.run();
-                                }, null, SharedConfig.suggestAnimatedEmoji || UserConfig.getInstance(currentAccount).isPremium(), false, true, 25);
+                            }, null, SharedConfig.suggestAnimatedEmoji || MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount), false, true, 25);
                             },
                             next -> {
                                 if (ConnectionsManager.getInstance(currentAccount).getConnectionState() != ConnectionsManager.ConnectionStateConnected) {
@@ -7992,7 +7993,7 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                                 });
                             },
                             next -> {
-                                if (SharedConfig.suggestAnimatedEmoji || UserConfig.getInstance(currentAccount).isPremium()) {
+                                if (SharedConfig.suggestAnimatedEmoji || MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                                     final String q = translitSafe((query + "").toLowerCase());
                                     final ArrayList<TLRPC.TL_messages_stickerSet> sets = MediaDataController.getInstance(currentAccount).getStickerSets(MediaDataController.TYPE_EMOJIPACKS);
 
@@ -8922,7 +8923,9 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
 
             private void addLocalPacks(Runnable finished) {
                 ArrayList<TLRPC.TL_messages_stickerSet> local = MediaDataController.getInstance(currentAccount).getStickerSets(MediaDataController.TYPE_IMAGE);
-                MessagesController.getInstance(currentAccount).filterPremiumStickers(local);
+                if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
+                    MessagesController.getInstance(currentAccount).filterPremiumStickers(local);
+                }
                 int index;
                 for (int a = 0, size = local.size(); a < size; a++) {
                     TLRPC.TL_messages_stickerSet set = local.get(a);
@@ -8939,7 +8942,9 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                     }
                 }
                 local = MediaDataController.getInstance(currentAccount).getStickerSets(MediaDataController.TYPE_FEATURED);
-                MessagesController.getInstance(currentAccount).filterPremiumStickers(local);
+                if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
+                    MessagesController.getInstance(currentAccount).filterPremiumStickers(local);
+                }
                 for (int a = 0, size = local.size(); a < size; a++) {
                     TLRPC.TL_messages_stickerSet set = local.get(a);
                     if ((index = AndroidUtilities.indexOfIgnoreCase(set.set.title, searchQuery)) >= 0) {

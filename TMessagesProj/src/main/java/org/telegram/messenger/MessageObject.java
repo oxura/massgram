@@ -3671,6 +3671,12 @@ public class MessageObject {
         if (massgramPremiumMediaInjected) {
             return "";
         }
+        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramCryptoManager.getInstance(currentAccount)
+            .decodePremiumPayload(getDialogId(), messageOwner.message, !isOutOwner());
+        if (premiumPayload != null) {
+            messageOwner.entities = premiumPayload.entities;
+            return premiumPayload.text != null ? premiumPayload.text : MassgramPremiumMessageCodec.getVisibleText(messageOwner.message);
+        }
         return MassgramCryptoManager.getInstance(currentAccount).getDisplayText(getDialogId(), messageOwner.message, !isOutOwner());
     }
 

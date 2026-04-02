@@ -33,6 +33,29 @@ public class MassgramPremiumMessageCodecTest {
     }
 
     @Test
+    public void decodeRestoresCustomEmojiEntitiesForPremiumRichText() {
+        String original = "\uD83D\uDE80 launch";
+        TLRPC.TL_messageEntityCustomEmoji entity = new TLRPC.TL_messageEntityCustomEmoji();
+        entity.offset = 0;
+        entity.length = 2;
+        entity.document_id = 777L;
+        entity.document = createPremiumCustomEmojiDocument(false);
+
+        java.util.ArrayList<TLRPC.MessageEntity> entities = new java.util.ArrayList<>();
+        entities.add(entity);
+
+        String encoded = MassgramPremiumMessageCodec.encodeText(original, entities);
+        MassgramPremiumMessageCodec.DecodedPayload payload = MassgramPremiumMessageCodec.decode(encoded);
+
+        assertNotNull(payload);
+        assertEquals(original, payload.text);
+        assertNotNull(payload.entities);
+        assertEquals(1, payload.entities.size());
+        assertTrue(payload.entities.get(0) instanceof TLRPC.TL_messageEntityCustomEmoji);
+        assertEquals(777L, ((TLRPC.TL_messageEntityCustomEmoji) payload.entities.get(0)).document_id);
+    }
+
+    @Test
     public void encodeStickerKeepsOnlyPlaceholderVisible() {
         TLRPC.TL_document document = createPremiumStickerDocument();
 
@@ -95,6 +118,24 @@ public class MassgramPremiumMessageCodecTest {
         videoAttribute.duration = 1;
         document.attributes.add(videoAttribute);
 
+        return document;
+    }
+
+    private static TLRPC.TL_document createPremiumCustomEmojiDocument(boolean free) {
+        TLRPC.TL_document document = new TLRPC.TL_document();
+        document.id = 777L;
+        document.access_hash = 123L;
+        document.file_reference = new byte[] {4, 5, 6};
+        document.date = 10;
+        document.mime_type = "application/x-tgsticker";
+        document.size = 1024;
+        document.dc_id = 2;
+
+        TLRPC.TL_documentAttributeCustomEmoji customEmoji = new TLRPC.TL_documentAttributeCustomEmoji();
+        customEmoji.free = free;
+        customEmoji.alt = "\uD83D\uDE80";
+        customEmoji.stickerset = new TLRPC.TL_inputStickerSetEmpty();
+        document.attributes.add(customEmoji);
         return document;
     }
 }

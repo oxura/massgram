@@ -111,16 +111,7 @@ public class MassgramCryptoManager {
             return text;
         }
         try {
-            byte[] iv = new byte[16];
-            secureRandom.nextBytes(iv);
-
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, buildSecretKey(getDialogKey(dialogId)), new IvParameterSpec(iv));
-            byte[] encrypted = cipher.doFinal(visibleText.getBytes(StandardCharsets.UTF_8));
-            byte[] payload = new byte[iv.length + encrypted.length];
-            System.arraycopy(iv, 0, payload, 0, iv.length);
-            System.arraycopy(encrypted, 0, payload, iv.length, encrypted.length);
-            return PAYLOAD_PREFIX + Base64.encodeToString(payload, Base64.NO_WRAP);
+            return encryptTextWithKey(getDialogKey(dialogId), visibleText, secureRandom);
         } catch (Exception e) {
             FileLog.e(e);
             return null;
@@ -129,7 +120,8 @@ public class MassgramCryptoManager {
 
     public MassgramPremiumMessageCodec.DecodedPayload decodePremiumPayload(long dialogId, String text, boolean incoming) {
         boolean supportsDialog = supportsDialog(dialogId);
-        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramPremiumMessageCodec.decode(text);
+        String resolvedText = resolveTransportText(dialogId, text, incoming, supportsDialog);
+        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramPremiumMessageCodec.decode(resolvedText);
         if (premiumPayload != null && incoming && supportsDialog) {
             markPeerDetected(dialogId);
         }
@@ -138,14 +130,23 @@ public class MassgramCryptoManager {
 
     public String getDisplayText(long dialogId, String text, boolean incoming) {
         boolean supportsDialog = supportsDialog(dialogId);
-        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = decodePremiumPayload(dialogId, text, incoming);
+        String resolvedText = resolveTransportText(dialogId, text, incoming, supportsDialog);
+        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramPremiumMessageCodec.decode(resolvedText);
         if (premiumPayload != null) {
-            return premiumPayload.text != null ? premiumPayload.text : MassgramPremiumMessageCodec.getVisibleText(text);
+            return premiumPayload.text != null ? premiumPayload.text : MassgramPremiumMessageCodec.getVisibleText(resolvedText);
         }
-        String visibleText = MassgramPremiumMessageCodec.getVisibleText(text);
-        if (visibleText != null && !TextUtils.equals(visibleText, text)) {
+        String visibleText = MassgramPremiumMessageCodec.getVisibleText(resolvedText);
+        if (visibleText != null && !TextUtils.equals(visibleText, resolvedText)) {
             return visibleText;
         }
+        return resolvedText;
+    }
+
+    public String resolveStoredMessageText(long dialogId, String text) {
+        return resolveTransportText(dialogId, text, false, supportsDialog(dialogId));
+    }
+
+    private String resolveTransportText(long dialogId, String text, boolean incoming, boolean supportsDialog) {
         boolean hasCapabilityMarker = containsCapabilityMarker(text);
         String sanitized = stripCapabilityMarker(text);
         if (incoming && supportsDialog && hasCapabilityMarker) {
@@ -155,19 +156,10 @@ public class MassgramCryptoManager {
             return sanitized;
         }
         try {
-            byte[] payload = Base64.decode(sanitized.substring(PAYLOAD_PREFIX.length()), Base64.DEFAULT);
-            if (payload.length <= 16) {
+            String decrypted = decryptTextWithKey(getDialogKey(dialogId), sanitized);
+            if (decrypted == null) {
                 return sanitized;
             }
-
-            byte[] iv = new byte[16];
-            byte[] encrypted = new byte[payload.length - 16];
-            System.arraycopy(payload, 0, iv, 0, iv.length);
-            System.arraycopy(payload, iv.length, encrypted, 0, encrypted.length);
-
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, buildSecretKey(getDialogKey(dialogId)), new IvParameterSpec(iv));
-            String decrypted = new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
             if (incoming) {
                 markPeerDetected(dialogId);
             }
@@ -177,7 +169,39 @@ public class MassgramCryptoManager {
         }
     }
 
-    private SecretKeySpec buildSecretKey(String rawKey) throws Exception {
+    static String encryptTextWithKey(String rawKey, String text, SecureRandom secureRandom) throws Exception {
+        if (text == null || text.length() == 0) {
+            return text;
+        }
+        byte[] iv = new byte[16];
+        secureRandom.nextBytes(iv);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, buildSecretKey(rawKey), new IvParameterSpec(iv));
+        byte[] encrypted = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
+        byte[] payload = new byte[iv.length + encrypted.length];
+        System.arraycopy(iv, 0, payload, 0, iv.length);
+        System.arraycopy(encrypted, 0, payload, iv.length, encrypted.length);
+        return PAYLOAD_PREFIX + java.util.Base64.getEncoder().withoutPadding().encodeToString(payload);
+    }
+
+    static String decryptTextWithKey(String rawKey, String payloadText) throws Exception {
+        if (payloadText == null || payloadText.length() == 0 || !payloadText.startsWith(PAYLOAD_PREFIX)) {
+            return payloadText;
+        }
+        byte[] payload = java.util.Base64.getDecoder().decode(payloadText.substring(PAYLOAD_PREFIX.length()));
+        if (payload.length <= 16) {
+            return null;
+        }
+        byte[] iv = new byte[16];
+        byte[] encrypted = new byte[payload.length - 16];
+        System.arraycopy(payload, 0, iv, 0, iv.length);
+        System.arraycopy(payload, iv.length, encrypted, 0, encrypted.length);
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, buildSecretKey(rawKey), new IvParameterSpec(iv));
+        return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
+    }
+
+    private static SecretKeySpec buildSecretKey(String rawKey) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] key = digest.digest(rawKey.getBytes(StandardCharsets.UTF_8));
         return new SecretKeySpec(key, "AES");

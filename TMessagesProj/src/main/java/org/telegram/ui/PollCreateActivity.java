@@ -38,6 +38,7 @@ import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaDataController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
@@ -251,7 +252,7 @@ public class PollCreateActivity extends BaseFragment implements NotificationCent
         answers = new CharSequence[maxAnswersCount];
         answersChecks = new boolean[maxAnswersCount];
         parentFragment = chatActivity;
-        isPremium = AccountInstance.getInstance(currentAccount).getUserConfig().isPremium();
+        isPremium = MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount);
         if (quiz != null) {
             quizPoll = quiz;
             quizOnly = quizPoll ? 1 : 2;

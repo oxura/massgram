@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.6-beta1",
-    "versionCode":  65929,
+    "versionName":  "12.5.6-beta2",
+    "versionCode":  65939,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "b5283749a6cd0c670defa79d3662888113fb826064a312709c2b12559d08cf4b",
-    "apkSize":  131455158,
-    "changelog":  "Massgram beta 12.5.6-beta1\n\n- Removed the old global Telegram Premium override so the client no longer breaks core Telegram premium logic\n- Switched premium text, todo and checklist messages to Massgram-only transport with a safe Unsupported fallback for regular clients\n- Moved premium sticker delivery to the same Massgram-only payload format and kept premium indicators local to Massgram clients only\n- Rolled back unsafe global speed overrides that caused jump-to-latest jank and startup instability, keeping only the safe Massgram transport changes\n- Fixed one flood-wait check in the download path and restored Telegram-native queue limits for smoother loader behavior\r\n"
+    "sha256":  "ae0dda688f497c15786978afd342a9a8f6fa7e0ee53bfccb8b91ced7e2ce8497",
+    "apkSize":  131459220,
+    "changelog":  "Massgram beta 12.5.6-beta2\n\n- Fixed Massgram premium transport so ordinary text no longer degrades into Unsupported Massgram message when local premium features are enabled\n- Added Massgram-only premium custom emoji transport so rich text is visible to Massgram clients and falls back to Unsupported Massgram message on regular clients\n- Opened the local premium UI gates for premium stickers and premium emoji in picker, search, preview and suggestion flows\n- Preserved compatibility between AES-256 chat encryption and Massgram-only premium payloads in private chats"
 }
 
