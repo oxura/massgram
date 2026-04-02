@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.6-beta2",
-    "versionCode":  65939,
+    "versionName":  "12.5.6-beta3",
+    "versionCode":  65949,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "ae0dda688f497c15786978afd342a9a8f6fa7e0ee53bfccb8b91ced7e2ce8497",
-    "apkSize":  131459220,
-    "changelog":  "Massgram beta 12.5.6-beta2\n\n- Fixed Massgram premium transport so ordinary text no longer degrades into Unsupported Massgram message when local premium features are enabled\n- Added Massgram-only premium custom emoji transport so rich text is visible to Massgram clients and falls back to Unsupported Massgram message on regular clients\n- Opened the local premium UI gates for premium stickers and premium emoji in picker, search, preview and suggestion flows\n- Preserved compatibility between AES-256 chat encryption and Massgram-only premium payloads in private chats"
+    "sha256":  "b18c1ff911cb7c70a2fab8164c6916981fcbf73afd83fa285d3fb806f31a006e",
+    "apkSize":  131459178,
+    "changelog":  "Massgram beta 12.5.6-beta3\n\n- Fixed a critical MessageObject regression that could crash immediately when opening chats after Massgram premium payload decoding\n- Restored stable dialog rendering so chat rows no longer appear with empty gaps caused by the same payload entity bug\n- Kept the earlier Massgram premium transport and local premium gate fixes intact"
 }
 
