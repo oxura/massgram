@@ -103,6 +103,7 @@ import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
@@ -2282,7 +2283,10 @@ public class EmojiView extends FrameLayout implements NotificationCenter.Notific
                     return;
                 }
                 StickerEmojiCell cell = (StickerEmojiCell) view;
-                if (cell.getSticker() != null && MessageObject.isPremiumSticker(cell.getSticker()) && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()) {
+                if (cell.getSticker() != null
+                    && MessageObject.isPremiumSticker(cell.getSticker())
+                    && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()
+                    && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
                     ContentPreviewViewer.getInstance().showMenuFor(cell);
                     return;
                 }

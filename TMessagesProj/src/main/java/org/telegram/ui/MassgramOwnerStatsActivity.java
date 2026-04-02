@@ -23,6 +23,7 @@ import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MassgramConfigManager;
+import org.telegram.messenger.MassgramTelemetryManager;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.Utilities;
@@ -47,6 +48,7 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
     private LinearLayout contentLayout;
     private TextView statusView;
     private StatsCard overviewCard;
+    private StatsCard usersCard;
     private StatsCard releasesCard;
     private StatsCard repositoryCard;
     private StatsCard deviceCard;
@@ -82,6 +84,7 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
         contentLayout.addView(statusView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         overviewCard = addSection(context, R.string.MassgramOwnerOverview);
+        usersCard = addSection(context, R.string.MassgramOwnerUsersSection);
         releasesCard = addSection(context, R.string.MassgramOwnerReleaseChannel);
         repositoryCard = addSection(context, R.string.MassgramOwnerRepository);
         deviceCard = addSection(context, R.string.MassgramOwnerLocalBuild);
@@ -128,8 +131,18 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
 
     private void bindStaticRows() {
         overviewCard.setRows(new ArrayList<RowData>() {{
-            add(new RowData(LocaleController.getString(R.string.MassgramOwnerOwnerAccess), LocaleController.getString(R.string.MassgramOwnerEnabled)));
-            add(new RowData(LocaleController.getString(R.string.MassgramOwnerBetaAccess), ApplicationLoader.applicationLoaderInstance.isBetaTester(getUserConfig().getClientUserId()) ? LocaleController.getString(R.string.MassgramOwnerEnabled) : LocaleController.getString(R.string.MassgramOwnerDisabled)));
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerTotalUsers), "—"));
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerActiveUsers), "—"));
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerOfflineUsers), "—"));
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerBetaUsers), "—"));
+        }});
+        usersCard.setRows(new ArrayList<RowData>() {{
+            add(new RowData(
+                LocaleController.getString(R.string.MassgramKnownUsers),
+                LocaleController.getString(R.string.Open),
+                LocaleController.getString(R.string.MassgramOwnerUsersInfo),
+                () -> presentFragment(new MassgramKnownUsersActivity())
+            ));
         }});
         deviceCard.setRows(new ArrayList<RowData>() {{
             add(new RowData(LocaleController.getString(R.string.MassgramOwnerInstalledVersion), BuildVars.BUILD_VERSION_STRING));
@@ -143,6 +156,32 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
 
     private void loadStats() {
         bindLoading(LocaleController.getString(R.string.MassgramOwnerStatsLoading));
+        loadDashboardStats();
+        loadRepositoryStats();
+    }
+
+    private void loadDashboardStats() {
+        MassgramTelemetryManager.getInstance().loadOwnerDashboard(getUserConfig().getClientUserId(), "", true, (data, error) -> {
+            if (getParentActivity() == null) {
+                return;
+            }
+            if (error != null) {
+                bindLoading(LocaleController.getString(R.string.MassgramOwnerStatsLoadFailed));
+                return;
+            }
+            if (data != null) {
+                bindLoading(LocaleController.formatString("MassgramOwnerStatsUpdated", R.string.MassgramOwnerStatsUpdated, LocaleController.getInstance().getFormatterStats().format(data.loadedAt)));
+                overviewCard.setRows(new ArrayList<RowData>() {{
+                    add(new RowData(LocaleController.getString(R.string.MassgramOwnerTotalUsers), formatCount(data.totalUsers)));
+                    add(new RowData(LocaleController.getString(R.string.MassgramOwnerActiveUsers), formatCount(data.activeUsers), LocaleController.getString(R.string.MassgramOwnerActiveUsersInfo)));
+                    add(new RowData(LocaleController.getString(R.string.MassgramOwnerOfflineUsers), formatCount(data.offlineUsers)));
+                    add(new RowData(LocaleController.getString(R.string.MassgramOwnerBetaUsers), formatCount(data.betaUsers)));
+                }});
+            }
+        });
+    }
+
+    private void loadRepositoryStats() {
         Utilities.globalQueue.postRunnable(() -> {
             OwnerStatsData data = new OwnerStatsData();
             String error = null;
@@ -207,7 +246,6 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
             final String finalError = error;
             AndroidUtilities.runOnUIThread(() -> {
                 if (finalError != null) {
-                    bindLoading(LocaleController.getString(R.string.MassgramOwnerStatsLoadFailed));
                     return;
                 }
                 lastLoadedAt = data.loadedAt;
@@ -218,13 +256,6 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
 
     private void bindOwnerStats(OwnerStatsData data) {
         bindLoading(LocaleController.formatString("MassgramOwnerStatsUpdated", R.string.MassgramOwnerStatsUpdated, LocaleController.getInstance().getFormatterStats().format(data.loadedAt)));
-
-        overviewCard.setRows(new ArrayList<RowData>() {{
-            add(new RowData(LocaleController.getString(R.string.MassgramOwnerApproxUsers), formatCount(data.approxUsers), LocaleController.getString(R.string.MassgramOwnerApproxUsersInfo)));
-            add(new RowData(LocaleController.getString(R.string.MassgramOwnerStableDownloads), formatCount(data.stableDownloads)));
-            add(new RowData(LocaleController.getString(R.string.MassgramOwnerBetaDownloads), formatCount(data.betaDownloads)));
-            add(new RowData(LocaleController.getString(R.string.MassgramOwnerTotalDownloads), formatCount(data.totalDownloads)));
-        }});
 
         releasesCard.setRows(new ArrayList<RowData>() {{
             add(new RowData(LocaleController.getString(R.string.MassgramOwnerLatestStable), data.latestStableName != null ? data.latestStableName : "-",
@@ -307,15 +338,21 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
         final CharSequence title;
         final CharSequence value;
         final CharSequence subtitle;
+        final Runnable action;
 
         private RowData(CharSequence title, CharSequence value) {
-            this(title, value, null);
+            this(title, value, null, null);
         }
 
         private RowData(CharSequence title, CharSequence value, CharSequence subtitle) {
+            this(title, value, subtitle, null);
+        }
+
+        private RowData(CharSequence title, CharSequence value, CharSequence subtitle, Runnable action) {
             this.title = title;
             this.value = value;
             this.subtitle = subtitle;
+            this.action = action;
         }
     }
 
@@ -343,8 +380,12 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
                 if (i < data.size()) {
                     RowData rowData = data.get(i);
                     row.bind(rowData.title, rowData.value, rowData.subtitle, i == data.size() - 1);
+                    row.setOnClickListener(rowData.action == null ? null : v -> rowData.action.run());
+                    row.setEnabled(rowData.action != null);
                     row.setVisibility(VISIBLE);
                 } else {
+                    row.setOnClickListener(null);
+                    row.setEnabled(false);
                     row.setVisibility(GONE);
                 }
             }

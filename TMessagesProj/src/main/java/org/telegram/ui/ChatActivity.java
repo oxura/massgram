@@ -164,6 +164,8 @@ import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LanguageDetector;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
+import org.telegram.messenger.MassgramPremiumMessageCodec;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -34231,6 +34233,20 @@ public class ChatActivity extends BaseFragment implements
 
     public void sendTodo(TLRPC.TL_messageMediaToDo todo, boolean notify, int scheduleDate, long payStars) {
         if (checkSlowModeAlert()) {
+            if (MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
+                String payloadMessage = MassgramPremiumMessageCodec.encodeText(buildMassgramTodoText(todo));
+                if (!TextUtils.isEmpty(payloadMessage)) {
+                    final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of(payloadMessage, dialog_id, replyingMessageObject, getThreadMessage(), null, false, null, null, null, notify, scheduleDate, 0, null, false);
+                    params2.quick_reply_shortcut = quickReplyShortcut;
+                    params2.quick_reply_shortcut_id = getQuickReplyId();
+                    params2.payStars = payStars;
+                    params2.monoForumPeer = getSendMonoForumPeerId();
+                    params2.suggestionParams = messageSuggestionParams;
+                    getSendMessagesHelper().sendMessage(params2);
+                    afterMessageSend();
+                }
+                return;
+            }
             final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_messageMediaPoll) null, dialog_id, replyingMessageObject, getThreadMessage(), null, null, notify, scheduleDate, 0);
             params2.todo = todo;
             params2.quick_reply_shortcut = quickReplyShortcut;
@@ -34241,6 +34257,32 @@ public class ChatActivity extends BaseFragment implements
             getSendMessagesHelper().sendMessage(params2);
             afterMessageSend();
         }
+    }
+
+    private String buildMassgramTodoText(TLRPC.TL_messageMediaToDo todo) {
+        if (todo == null || todo.todo == null) {
+            return LocaleController.getString(R.string.MessageTodo);
+        }
+        StringBuilder builder = new StringBuilder();
+        if (todo.todo.title != null && !TextUtils.isEmpty(todo.todo.title.text)) {
+            builder.append(todo.todo.title.text.trim());
+        }
+        if (todo.todo.list != null) {
+            for (int i = 0; i < todo.todo.list.size(); i++) {
+                TLRPC.TodoItem item = todo.todo.list.get(i);
+                if (item == null || item.title == null || TextUtils.isEmpty(item.title.text)) {
+                    continue;
+                }
+                if (builder.length() > 0) {
+                    builder.append('\n');
+                }
+                builder.append("- [ ] ").append(item.title.text.trim());
+            }
+        }
+        if (builder.length() == 0) {
+            return LocaleController.getString(R.string.MessageTodo);
+        }
+        return builder.toString();
     }
 
     public void sendMedia(MediaController.PhotoEntry photoEntry, VideoEditedInfo videoEditedInfo, boolean notify, int scheduleDate, int scheduleRepeatPeriod, boolean forceDocument, long stars) {

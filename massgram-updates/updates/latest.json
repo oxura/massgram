@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.3",
-    "versionCode":  65849,
+    "versionName":  "12.5.5",
+    "versionCode":  65919,
     "apkUrl":  "https://github.com/oxura/massgram/releases/latest/download/massgram.apk",
-    "sha256":  "f11ce0f3e073f75eecb354868f3e6518106fbf8cafaecf41e3c70d38cde18a87",
-    "apkSize":  131391274,
-    "changelog":  "Massgram 12.5.3\n\n- Added profile Massgram indicator\n- Added local AES chat encryption for private dialogs"
+    "sha256":  "36d0fbe9ad85d1b01a71853a82c443f7f483aa571eff1ff23d56e8029aa0b6b3",
+    "apkSize":  131450254,
+    "changelog":  "Massgram 12.5.5\n\n- Added an owner-only Massgram dashboard with total users, active now, offline counts and a searchable user list.\n- Added a lightweight once-per-minute heartbeat while the app is open to power Massgram online and offline status in the dashboard.\n- Heartbeat sends Telegram user ID, username or display name, app version, build channel, device model, Android version and locale.\n- Heartbeat does not send chat history, message text, media, contacts or call audio."
 }
 

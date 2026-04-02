@@ -17,6 +17,8 @@ configurations.all {
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
+
     implementation 'androidx.core:core:1.16.0'
     implementation 'androidx.palette:palette:1.0.0'
     implementation 'androidx.exifinterface:exifinterface:1.3.6'
@@ -102,6 +104,8 @@ android {
     defaultConfig {
         minSdkVersion 21
         targetSdkVersion 35
+        buildConfigField "String", "MASSGRAM_SUPABASE_URL", "\"${(project.findProperty('MASSGRAM_SUPABASE_URL') ?: '').toString()}\""
+        buildConfigField "String", "MASSGRAM_SUPABASE_PUBLISHABLE_KEY", "\"${(project.findProperty('MASSGRAM_SUPABASE_PUBLISHABLE_KEY') ?: '').toString()}\""
 
         vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
 

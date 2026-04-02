@@ -38,6 +38,7 @@ import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
@@ -269,7 +270,9 @@ public class MentionsAdapter extends RecyclerListView.SelectionAdapter implement
         if (stickersMap != null && stickersMap.containsKey(key)) {
             return;
         }
-        if (!UserConfig.getInstance(currentAccount).isPremium() && MessageObject.isPremiumSticker(document)) {
+        if (!UserConfig.getInstance(currentAccount).isPremium()
+            && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+            && MessageObject.isPremiumSticker(document)) {
             return;
         }
         if (stickers == null) {
@@ -294,7 +297,9 @@ public class MentionsAdapter extends RecyclerListView.SelectionAdapter implement
             if (stickersMap != null && stickersMap.containsKey(key)) {
                 continue;
             }
-            if (!UserConfig.getInstance(currentAccount).isPremium() && MessageObject.isPremiumSticker(document)) {
+            if (!UserConfig.getInstance(currentAccount).isPremium()
+                && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+                && MessageObject.isPremiumSticker(document)) {
                 continue;
             }
             for (int b = 0, size2 = document.attributes.size(); b < size2; b++) {

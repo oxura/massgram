@@ -55,6 +55,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
@@ -494,7 +495,9 @@ public class ContentPreviewViewer {
                 menuVisible = true;
                 containerView.invalidate();
             } else if (currentContentType == CONTENT_TYPE_STICKER) {
-                if (MessageObject.isPremiumSticker(currentDocument) && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()) {
+                if (MessageObject.isPremiumSticker(currentDocument)
+                    && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()
+                    && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
                     showUnlockPremiumView();
                     menuVisible = true;
                     containerView.invalidate();

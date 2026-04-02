@@ -13,6 +13,7 @@ public class MassgramConfigManager {
     private static final String KEY_BLOCK_SPONSORED_MESSAGES = "massgram_block_sponsored_messages";
     private static final String KEY_DISABLE_LOCAL_STATS = "massgram_disable_local_stats";
     private static final String KEY_EXPANDED_UI_LIMITS = "massgram_expanded_ui_limits";
+    private static final String KEY_PREMIUM_UNLOCK = "massgram_premium_unlock";
 
     private static final int DEFAULT_VOICE_PITCH_SEMITONES = 0;
     private static final int MIN_VOICE_PITCH_SEMITONES = -12;
@@ -95,6 +96,19 @@ public class MassgramConfigManager {
 
     public boolean isExpandedUiLimitsEnabled() {
         return getPreferences().getBoolean(KEY_EXPANDED_UI_LIMITS, true);
+    }
+
+    public boolean isPremiumUnlockEnabled() {
+        return getPreferences().getBoolean(KEY_PREMIUM_UNLOCK, false);
+    }
+
+    public void setPremiumUnlockEnabled(boolean enabled) {
+        SharedPreferences preferences = getPreferences();
+        if (preferences.getBoolean(KEY_PREMIUM_UNLOCK, false) == enabled) {
+            return;
+        }
+        preferences.edit().putBoolean(KEY_PREMIUM_UNLOCK, enabled).apply();
+        notifyChanged();
     }
 
     public boolean isOwner(long userId) {

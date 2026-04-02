@@ -179,6 +179,7 @@ public class MessageObject {
     public boolean flickerLoading;
     public TLRPC.VideoSize emojiMarkup;
     private boolean emojiAnimatedStickerLoading;
+    private boolean massgramPremiumMediaInjected;
     public String emojiAnimatedStickerColor;
     public CharSequence messageText;
     public CharSequence messageTextShort;
@@ -1873,6 +1874,7 @@ public class MessageObject {
             fromUser = getUser(users, sUsers, message.from_id.user_id);
         }
 
+        applyMassgramPremiumPayload();
         updateMessageText(users, chats, sUsers, sChats);
         setType();
         if (generateLayout) {
@@ -3666,7 +3668,32 @@ public class MessageObject {
         if (messageOwner == null) {
             return null;
         }
+        if (massgramPremiumMediaInjected) {
+            return "";
+        }
         return MassgramCryptoManager.getInstance(currentAccount).getDisplayText(getDialogId(), messageOwner.message, !isOutOwner());
+    }
+
+    private void applyMassgramPremiumPayload() {
+        massgramPremiumMediaInjected = false;
+        if (messageOwner == null || TextUtils.isEmpty(messageOwner.message)) {
+            return;
+        }
+        if (messageOwner.media != null
+            && !(messageOwner.media instanceof TLRPC.TL_messageMediaEmpty)
+            && !(messageOwner.media instanceof TLRPC.TL_messageMediaUnsupported)) {
+            return;
+        }
+        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramCryptoManager.getInstance(currentAccount)
+            .decodePremiumPayload(getDialogId(), messageOwner.message, !messageOwner.out);
+        if (premiumPayload == null || premiumPayload.document == null) {
+            return;
+        }
+        TLRPC.TL_messageMediaDocument media = new TLRPC.TL_messageMediaDocument();
+        media.document = premiumPayload.document;
+        media.flags |= 1;
+        messageOwner.media = media;
+        massgramPremiumMediaInjected = true;
     }
 
     public void applyNewText(CharSequence text) {
