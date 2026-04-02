@@ -127,8 +127,25 @@ public class MassgramCryptoManager {
         }
     }
 
+    public MassgramPremiumMessageCodec.DecodedPayload decodePremiumPayload(long dialogId, String text, boolean incoming) {
+        boolean supportsDialog = supportsDialog(dialogId);
+        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramPremiumMessageCodec.decode(text);
+        if (premiumPayload != null && incoming && supportsDialog) {
+            markPeerDetected(dialogId);
+        }
+        return premiumPayload;
+    }
+
     public String getDisplayText(long dialogId, String text, boolean incoming) {
         boolean supportsDialog = supportsDialog(dialogId);
+        MassgramPremiumMessageCodec.DecodedPayload premiumPayload = decodePremiumPayload(dialogId, text, incoming);
+        if (premiumPayload != null) {
+            return premiumPayload.text != null ? premiumPayload.text : MassgramPremiumMessageCodec.getVisibleText(text);
+        }
+        String visibleText = MassgramPremiumMessageCodec.getVisibleText(text);
+        if (visibleText != null && !TextUtils.equals(visibleText, text)) {
+            return visibleText;
+        }
         boolean hasCapabilityMarker = containsCapabilityMarker(text);
         String sanitized = stripCapabilityMarker(text);
         if (incoming && supportsDialog && hasCapabilityMarker) {

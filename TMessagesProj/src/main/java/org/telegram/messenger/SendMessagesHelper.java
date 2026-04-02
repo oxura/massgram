@@ -1830,6 +1830,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (document == null) {
             return;
         }
+        if (shouldSendMassgramPremiumSticker(document, caption, videoEditedInfo, peer)) {
+            sendMassgramPremiumStickerAsPayload(document, peer, replyToMsg, replyToTopMsg, storyItem, quote, sendAnimationData, notify, scheduleDate, scheduleRepeatPeriod, updateStickersOrder, parentObject, quick_reply_shortcut, quick_reply_shortcut_id, stars, monoForumPeerId, suggestionParams);
+            return;
+        }
         if (DialogObject.isEncryptedDialog(peer)) {
             int encryptedId = DialogObject.getEncryptedChatId(peer);
             TLRPC.EncryptedChat encryptedChat = getMessagesController().getEncryptedChat(encryptedId);
@@ -3181,6 +3185,48 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         return GhostModeManager.getInstance().shouldDisableLocalLinkPreviews();
     }
 
+    private boolean shouldSendMassgramPremiumText(MessageObject retryMessageObject, String message) {
+        return retryMessageObject == null
+            && MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+            && !TextUtils.isEmpty(message)
+            && !MassgramPremiumMessageCodec.hasPayload(message);
+    }
+
+    private boolean shouldSendMassgramPremiumSticker(TLRPC.Document document, CharSequence caption, VideoEditedInfo videoEditedInfo, long peer) {
+        return MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+            && document != null
+            && MessageObject.isPremiumSticker(document)
+            && TextUtils.isEmpty(caption)
+            && videoEditedInfo == null
+            && !DialogObject.isEncryptedDialog(peer);
+    }
+
+    private void sendMassgramPremiumStickerAsPayload(TLRPC.Document document, long peer, MessageObject replyToMsg, MessageObject replyToTopMsg, TL_stories.StoryItem storyItem, ChatActivity.ReplyQuote quote, MessageObject.SendAnimationData sendAnimationData, boolean notify, int scheduleDate, int scheduleRepeatPeriod, boolean updateStickersOrder, Object parentObject, String quickReplyShortcut, int quickReplyShortcutId, long stars, long monoForumPeerId, MessageSuggestionParams suggestionParams) {
+        String payloadMessage = MassgramPremiumMessageCodec.encodeSticker(document);
+        if (payloadMessage == null) {
+            return;
+        }
+        SendMessageParams sendMessageParams = SendMessageParams.of(payloadMessage, peer, replyToMsg, replyToTopMsg, null, false, null, null, null, notify, scheduleDate, scheduleRepeatPeriod, sendAnimationData, updateStickersOrder);
+        sendMessageParams.parentObject = parentObject;
+        sendMessageParams.replyToStoryItem = storyItem;
+        sendMessageParams.replyQuote = quote;
+        sendMessageParams.quick_reply_shortcut = quickReplyShortcut;
+        sendMessageParams.quick_reply_shortcut_id = quickReplyShortcutId;
+        sendMessageParams.payStars = stars;
+        sendMessageParams.monoForumPeer = monoForumPeerId;
+        sendMessageParams.suggestionParams = suggestionParams;
+        sendMessage(sendMessageParams);
+    }
+
+    private boolean shouldEncodeEditedMassgramPremiumText(MessageObject messageObject, String message) {
+        if (TextUtils.isEmpty(message)) {
+            return false;
+        }
+        String currentMessage = messageObject != null && messageObject.messageOwner != null ? messageObject.messageOwner.message : null;
+        return MassgramPremiumMessageCodec.hasPayload(currentMessage)
+            || shouldSendMassgramPremiumText(null, message);
+    }
+
     public int editMessage(MessageObject messageObject, String message, boolean searchLinks, final BaseFragment fragment, ArrayList<TLRPC.MessageEntity> entities, int scheduleDate, int scheduleRepeatPeriod) {
         if (fragment == null || fragment.getParentActivity() == null) {
             return 0;
@@ -3198,6 +3244,14 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     return 0;
                 }
                 message = encryptedMessage;
+                searchLinks = false;
+                entities = null;
+            } else if (shouldEncodeEditedMassgramPremiumText(messageObject, message)) {
+                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message);
+                if (payloadMessage == null) {
+                    return 0;
+                }
+                message = payloadMessage;
                 searchLinks = false;
                 entities = null;
             } else if (cryptoManager.supportsDialog(dialogId) && !TextUtils.isEmpty(message)) {
@@ -3901,34 +3955,56 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (message == null && caption == null) {
             caption = "";
         }
-        if (retryMessageObject == null && DialogObject.isUserDialog(peer)) {
+        if (retryMessageObject == null) {
             MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
-            if (cryptoManager.isEncryptionEnabled(peer)) {
-                boolean encryptedAnyText = false;
-                if (!TextUtils.isEmpty(message)) {
-                    String encryptedMessage = cryptoManager.encryptOutgoingText(peer, message);
-                    if (encryptedMessage == null) {
+            if (DialogObject.isUserDialog(peer)) {
+                if (cryptoManager.isEncryptionEnabled(peer)) {
+                    boolean encryptedAnyText = false;
+                    if (!TextUtils.isEmpty(message)) {
+                        String encryptedMessage = cryptoManager.encryptOutgoingText(peer, message);
+                        if (encryptedMessage == null) {
+                            return;
+                        }
+                        message = encryptedMessage;
+                        encryptedAnyText = true;
+                    }
+                    if (!TextUtils.isEmpty(caption)) {
+                        String encryptedCaption = cryptoManager.encryptOutgoingText(peer, caption);
+                        if (encryptedCaption == null) {
+                            return;
+                        }
+                        caption = encryptedCaption;
+                        encryptedAnyText = true;
+                    }
+                    if (encryptedAnyText) {
+                        searchLinks = false;
+                        webPage = null;
+                        mediaWebPage = null;
+                        entities = null;
+                    }
+                } else if (shouldSendMassgramPremiumText(retryMessageObject, message)) {
+                    String payloadMessage = MassgramPremiumMessageCodec.encodeText(message);
+                    if (payloadMessage == null) {
                         return;
                     }
-                    message = encryptedMessage;
-                    encryptedAnyText = true;
-                }
-                if (!TextUtils.isEmpty(caption)) {
-                    String encryptedCaption = cryptoManager.encryptOutgoingText(peer, caption);
-                    if (encryptedCaption == null) {
-                        return;
-                    }
-                    caption = encryptedCaption;
-                    encryptedAnyText = true;
-                }
-                if (encryptedAnyText) {
                     searchLinks = false;
                     webPage = null;
                     mediaWebPage = null;
+                    message = payloadMessage;
                     entities = null;
+                } else if (!TextUtils.isEmpty(message)) {
+                    message = cryptoManager.appendCapabilityMarker(peer, message);
                 }
-            } else if (!TextUtils.isEmpty(message)) {
-                message = cryptoManager.appendCapabilityMarker(peer, message);
+            } else if (!DialogObject.isEncryptedDialog(peer) && shouldSendMassgramPremiumText(retryMessageObject, message)) {
+                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message);
+                if (payloadMessage == null) {
+                    return;
+                }
+                message = payloadMessage;
+                searchLinks = false;
+                webPage = null;
+                mediaWebPage = null;
+                entities = null;
             }
         }
 

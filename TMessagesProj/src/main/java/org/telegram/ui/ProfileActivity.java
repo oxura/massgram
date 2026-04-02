@@ -146,6 +146,7 @@ import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LanguageDetector;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MassgramCryptoManager;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
@@ -8788,6 +8789,15 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return user != null && !user.bot && user.id != getUserConfig().getClientUserId();
     }
 
+    private boolean shouldShowMassgramPremiumProfileBadge(TLRPC.User user) {
+        return user != null
+            && !myProfile
+            && !isBot
+            && user.id != 0
+            && MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+            && MassgramCryptoManager.getInstance(currentAccount).isPeerDetected(user.id);
+    }
+
     private void toggleMassgramEncryption() {
         if (!canShowMassgramRows()) {
             return;
@@ -11269,6 +11279,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         rightIconIsStatus = true;
                         rightIconIsPremium = false;
                         nameTextView[a].setRightDrawable(getEmojiStatusDrawable(user.emoji_status, false, false, a));
+                        nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrPremium);
+                    } else if (shouldShowMassgramPremiumProfileBadge(user)) {
+                        rightIconIsStatus = false;
+                        rightIconIsPremium = true;
+                        nameTextView[a].setRightDrawable(getEmojiStatusDrawable(null, false, false, a));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrPremium);
                     } else if (getMessagesController().isPremiumUser(user)) {
                         rightIconIsStatus = false;

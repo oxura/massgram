@@ -61,6 +61,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private static final int BUTTON_BLOCK_SPONSORED = 8;
     private static final int BUTTON_DISABLE_LOCAL_STATS = 9;
     private static final int BUTTON_OWNER_STATS = 10;
+    private static final int BUTTON_UNLOCK_PREMIUM = 11;
 
     private final HashSet<Integer> expandedInfoRows = new HashSet<>();
 
@@ -73,6 +74,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private MassgramSettingRow disableLinkPreviewRow;
     private MassgramSettingRow blockSponsoredRow;
     private MassgramSettingRow disableLocalStatsRow;
+    private MassgramSettingRow unlockPremiumRow;
     private MassgramActionRow updateRow;
     private MassgramActionRow betaUpdateRow;
     private MassgramActionRow ownerStatsRow;
@@ -155,12 +157,14 @@ public class MassgramSettingsActivity extends UniversalFragment {
         disableLinkPreviewRow = new MassgramSettingRow(context, R.drawable.msg_link);
         blockSponsoredRow = new MassgramSettingRow(context, R.drawable.outline_shield_check);
         disableLocalStatsRow = new MassgramSettingRow(context, R.drawable.mini_stats);
+        unlockPremiumRow = new MassgramSettingRow(context, R.drawable.msg_premium_liststar);
         privacyCard.addView(ghostModeRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(saveDeletedRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(relayCallsRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(disableLinkPreviewRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(blockSponsoredRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         privacyCard.addView(disableLocalStatsRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        privacyCard.addView(unlockPremiumRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         settingsContentView.addView(privacyCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         settingsContentView.addView(createSpacer(context, 14));
@@ -288,6 +292,20 @@ public class MassgramSettingsActivity extends UniversalFragment {
             true,
             () -> {
                 configManager.setLocalStatsDisabled(!configManager.isLocalStatsDisabled());
+                refreshSettingsState();
+            }
+        );
+        bindRow(
+            unlockPremiumRow,
+            BUTTON_UNLOCK_PREMIUM,
+            LocaleController.getString(R.string.MassgramUnlockPremium),
+            LocaleController.getString(R.string.MassgramUnlockPremiumInfo),
+            configManager.isPremiumUnlockEnabled(),
+            true,
+            true,
+            () -> {
+                boolean newValue = !configManager.isPremiumUnlockEnabled();
+                configManager.setPremiumUnlockEnabled(newValue);
                 refreshSettingsState();
             }
         );

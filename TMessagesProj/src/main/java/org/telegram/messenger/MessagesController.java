@@ -883,7 +883,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean isPremiumUser(TLRPC.User currentUser) {
-        return !premiumFeaturesBlocked() && currentUser.premium && !isSupportUser(currentUser);
+        return currentUser != null && !premiumFeaturesBlocked() && currentUser.premium && !isSupportUser(currentUser);
     }
 
     public boolean didPressTranscribeButtonEnough() {
@@ -912,7 +912,7 @@ public class MessagesController extends BaseController implements NotificationCe
 
 
     public ArrayList<TLRPC.TL_messages_stickerSet> filterPremiumStickers(ArrayList<TLRPC.TL_messages_stickerSet> stickerSets) {
-        if (!premiumFeaturesBlocked()) {
+        if (!premiumFeaturesBlocked() || MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
             return stickerSets;
         }
         for (int i = 0; i < stickerSets.size(); i++) {
@@ -928,7 +928,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public TLRPC.TL_messages_stickerSet filterPremiumStickers(TLRPC.TL_messages_stickerSet stickerSet) {
-        if (!premiumFeaturesBlocked() || stickerSet == null) {
+        if (!premiumFeaturesBlocked() || MassgramConfigManager.getInstance().isPremiumUnlockEnabled() || stickerSet == null) {
             return stickerSet;
         }
         try {
@@ -6786,11 +6786,11 @@ public class MessagesController extends BaseController implements NotificationCe
             }
         } else {
             if (!fromCache) {
-                users.put(user.id, user);
                 if (user.id == getUserConfig().getClientUserId()) {
                     getUserConfig().setCurrentUser(user);
                     getUserConfig().saveConfig(true);
                 }
+                users.put(user.id, user);
                 getUserNameResolver().update(oldUser, user);
                 if (oldUser != null && user.status != null && oldUser.status != null && user.status.expires != oldUser.status.expires) {
                     return true;

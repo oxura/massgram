@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="AppName">Telegram</string>
     <string name="AppNameBeta">Telegram Beta</string>
@@ -284,6 +284,10 @@
     <string name="MassgramBlockSponsoredInfo">Скрывает спонсируемые сообщения в поддерживаемых чатах и оставляет рекламный кэш пустым на этом клиенте.</string>
     <string name="MassgramDisableLocalStats">Отключить локальную статистику</string>
     <string name="MassgramDisableLocalStatsInfo">Перестаёт собирать внутри Massgram локальные счётчики трафика и медиа. Уже сохранённые данные не очищаются.</string>
+    <string name="MassgramUnlockPremium">Премиум-сообщения Massgram</string>
+    <string name="MassgramUnlockPremiumInfo">Отправляет премиум-сообщения только для Massgram. Обычные клиенты Telegram видят только "Unsupported Massgram message", а Massgram локально декодирует скрытое содержимое.</string>
+    <string name="MassgramDownloadSpeedLimitedMessage">Локальное ускорение Massgram уже включено. Сейчас Telegram ограничивает скорость этой загрузки на стороне сервера.</string>
+    <string name="MassgramUploadSpeedLimitedMessage">Локальное ускорение Massgram уже включено. Сейчас Telegram ограничивает скорость этой отправки на стороне сервера.</string>
     <string name="MassgramCheckUpdates">Проверить обновления</string>
     <string name="MassgramCurrentVersion">Текущая версия: %1$s</string>
     <string name="MassgramChangelogAction">История</string>

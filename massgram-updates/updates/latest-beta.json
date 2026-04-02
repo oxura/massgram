@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.4-beta5",
-    "versionCode":  65899,
+    "versionName":  "12.5.6-beta1",
+    "versionCode":  65929,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "862cb1273ed3b2fa3c3eb1cf8984a527dba2dc89f3ed4ac66460c12ea0340ae5",
-    "apkSize":  131433463,
-    "changelog":  "Massgram beta 12.5.4-beta5\n\n- Fixed the voice pitch button visibility in the real chat composer\n- Stable changelog source remains active for the update row"
+    "sha256":  "b5283749a6cd0c670defa79d3662888113fb826064a312709c2b12559d08cf4b",
+    "apkSize":  131455158,
+    "changelog":  "Massgram beta 12.5.6-beta1\n\n- Removed the old global Telegram Premium override so the client no longer breaks core Telegram premium logic\n- Switched premium text, todo and checklist messages to Massgram-only transport with a safe Unsupported fallback for regular clients\n- Moved premium sticker delivery to the same Massgram-only payload format and kept premium indicators local to Massgram clients only\n- Rolled back unsafe global speed overrides that caused jump-to-latest jank and startup instability, keeping only the safe Massgram transport changes\n- Fixed one flood-wait check in the download path and restored Telegram-native queue limits for smoother loader behavior\r\n"
 }
 

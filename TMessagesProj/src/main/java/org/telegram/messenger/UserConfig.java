@@ -569,10 +569,11 @@ public class UserConfig extends BaseController {
 
     public boolean isPremium() {
         TLRPC.User user = currentUser;
-        if (user == null) {
-            return false;
-        }
-        return user.premium;
+        return user != null && user.premium;
+    }
+
+    public void applyMassgramPremiumOverride() {
+        // Intentionally left empty. Massgram premium mode no longer mutates Telegram Premium state.
     }
 
     public Long getEmojiStatus() {

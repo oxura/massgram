@@ -2295,6 +2295,8 @@
     <string name="MassgramBlockSponsoredInfo">Hides sponsored messages in supported chats and keeps the ad slot cache empty on this client.</string>
     <string name="MassgramDisableLocalStats">Disable local stats</string>
     <string name="MassgramDisableLocalStatsInfo">Stops collecting local traffic and media counters inside Massgram. Existing saved counters remain unchanged.</string>
+    <string name="MassgramUnlockPremium">Massgram premium messages</string>
+    <string name="MassgramUnlockPremiumInfo">Sends Massgram-only premium messages. Official Telegram clients only see "Unsupported Massgram message", while Massgram clients decode and show the hidden content locally.</string>
     <string name="MassgramCheckUpdates">Check for updates</string>
     <string name="MassgramCurrentVersion">Current version: %1$s</string>
     <string name="MassgramChangelogAction">Changelog</string>
@@ -7993,6 +7995,8 @@
     <string name="DownloadSpeedLimitedMessage">Subscribe to **Telegram Premium** and increase download speeds %d times.</string>
     <string name="UploadSpeedLimited">Upload speed limited</string>
     <string name="UploadSpeedLimitedMessage">Subscribe to **Telegram Premium** and increase upload speeds %d times.</string>
+    <string name="MassgramDownloadSpeedLimitedMessage">Massgram local speed boost is already enabled. Telegram server is throttling this download right now.</string>
+    <string name="MassgramUploadSpeedLimitedMessage">Massgram local speed boost is already enabled. Telegram server is throttling this upload right now.</string>
     <string name="PrivacyBiometryBotsButton">Bots with biometry access</string>
     <string name="PrivacyBiometryBots">Bots with biometry</string>
     <string name="PrivacyBiometryBotsInfo">Web-apps can request permission for fingerprint check.</string>

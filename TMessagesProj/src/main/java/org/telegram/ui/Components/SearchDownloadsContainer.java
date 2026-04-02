@@ -769,7 +769,7 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                 if (FileLoader.getInstance(currentAccount).checkLoadCaughtPremiumFloodWait(messageObject.getFileName())) {
                     showPremiumFloodWaitBulletin(false);
                     return;
-                } else if (FileLoader.getInstance(currentAccount).checkLoadCaughtPremiumFloodWait(messageObject.getFileName())) {
+                } else if (FileLoader.getInstance(currentAccount).checkUploadCaughtPremiumFloodWait(messageObject.getFileName())) {
                     showPremiumFloodWaitBulletin(true);
                     return;
                 }
