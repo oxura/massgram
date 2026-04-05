@@ -3675,7 +3675,13 @@ public class MessageObject {
             .decodePremiumPayload(getDialogId(), messageOwner.message, !isOutOwner());
         if (premiumPayload != null) {
             messageOwner.entities = premiumPayload.entities != null ? premiumPayload.entities : new ArrayList<>();
-            return premiumPayload.text != null ? premiumPayload.text : MassgramPremiumMessageCodec.getVisibleText(messageOwner.message);
+            if (premiumPayload.text != null) {
+                return premiumPayload.text;
+            }
+            if (premiumPayload.todo != null || premiumPayload.document != null) {
+                return "";
+            }
+            return MassgramPremiumMessageCodec.getVisibleText(messageOwner.message);
         }
         return MassgramCryptoManager.getInstance(currentAccount).getDisplayText(getDialogId(), messageOwner.message, !isOutOwner());
     }
@@ -3692,7 +3698,15 @@ public class MessageObject {
         }
         MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramCryptoManager.getInstance(currentAccount)
             .decodePremiumPayload(getDialogId(), messageOwner.message, !messageOwner.out);
-        if (premiumPayload == null || premiumPayload.document == null) {
+        if (premiumPayload == null) {
+            return;
+        }
+        if (premiumPayload.todo != null) {
+            messageOwner.media = premiumPayload.todo;
+            massgramPremiumMediaInjected = true;
+            return;
+        }
+        if (premiumPayload.document == null) {
             return;
         }
         TLRPC.TL_messageMediaDocument media = new TLRPC.TL_messageMediaDocument();
@@ -7114,6 +7128,8 @@ public class MessageObject {
             } else if (isMusic() || isVoice()) {
                 addUrlsByPattern(isOutOwner(), caption, true, 4, (int) getDuration(), false);
             }
+        } else {
+            caption = null;
         }
     }
 

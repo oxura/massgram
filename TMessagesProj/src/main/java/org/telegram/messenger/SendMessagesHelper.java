@@ -2863,11 +2863,22 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             if (!retry) {
                 if (messageObject.editingMessage != null) {
                     String oldMessge = newMsg.message;
-                    newMsg.message = messageObject.editingMessage.toString();
+                    PreparedMassgramEditedText preparedText = prepareMassgramEditedText(
+                        messageObject,
+                        messageObject.editingMessage,
+                        messageObject.editingMessageEntities,
+                        messageObject.editingMessageSearchWebPage
+                    );
+                    if (preparedText == null) {
+                        revertEditingMessageObject(messageObject);
+                        return;
+                    }
+                    newMsg.message = preparedText.message;
+                    messageObject.editingMessageSearchWebPage = preparedText.searchLinks;
                     messageObject.caption = null;
                     if (type == 1) {
-                        if (messageObject.editingMessageEntities != null) {
-                            newMsg.entities = messageObject.editingMessageEntities;
+                        if (preparedText.entities != null) {
+                            newMsg.entities = preparedText.entities;
                             newMsg.flags |= 128;
                         } else if (!TextUtils.equals(oldMessge, newMsg.message)) {
                             newMsg.flags &=~ 128;
@@ -2876,18 +2887,11 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                             messageObject.generateCaption();
                         }
                     } else {
-                        if (messageObject.editingMessageEntities != null) {
-                            newMsg.entities = messageObject.editingMessageEntities;
+                        if (preparedText.entities != null) {
+                            newMsg.entities = preparedText.entities;
                             newMsg.flags |= 128;
-                        } else {
-                            CharSequence[] message = new CharSequence[]{messageObject.editingMessage};
-                            ArrayList<TLRPC.MessageEntity> entities = getMediaDataController().getEntities(message, supportsSendingNewEntities);
-                            if (entities != null && !entities.isEmpty()) {
-                                newMsg.entities = entities;
-                                newMsg.flags |= 128;
-                            } else if (!TextUtils.equals(oldMessge, newMsg.message)) {
-                                newMsg.flags &=~ 128;
-                            }
+                        } else if (!TextUtils.equals(oldMessge, newMsg.message)) {
+                            newMsg.flags &=~ 128;
                         }
                         messageObject.generateCaption();
                     }
@@ -3121,19 +3125,22 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                     request.flags |= 131072;
                 }
                 if (messageObject.editingMessage != null) {
-                    request.message = messageObject.editingMessage.toString();
+                    PreparedMassgramEditedText preparedText = prepareMassgramEditedText(
+                        messageObject,
+                        messageObject.editingMessage,
+                        messageObject.editingMessageEntities,
+                        messageObject.editingMessageSearchWebPage
+                    );
+                    if (preparedText == null) {
+                        revertEditingMessageObject(messageObject);
+                        return;
+                    }
+                    request.message = preparedText.message;
                     request.flags |= 2048;
-                    request.no_webpage = !messageObject.editingMessageSearchWebPage;
-                    if (messageObject.editingMessageEntities != null) {
-                        request.entities = messageObject.editingMessageEntities;
+                    request.no_webpage = !preparedText.searchLinks;
+                    if (preparedText.entities != null) {
+                        request.entities = preparedText.entities;
                         request.flags |= 8;
-                    } else {
-                        CharSequence[] message = new CharSequence[]{messageObject.editingMessage};
-                        ArrayList<TLRPC.MessageEntity> entities = getMediaDataController().getEntities(message, supportsSendingNewEntities);
-                        if (entities != null && !entities.isEmpty()) {
-                            request.entities = entities;
-                            request.flags |= 8;
-                        }
                     }
                     messageObject.editingMessage = null;
                     messageObject.editingMessageEntities = null;
@@ -3193,7 +3200,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     private boolean shouldSendMassgramPremiumSticker(TLRPC.Document document, CharSequence caption, VideoEditedInfo videoEditedInfo, long peer) {
-        return MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+        return MassgramConfigManager.getInstance().isMassgramFeaturesEnabled()
             && document != null
             && MessageObject.isPremiumSticker(document)
             && TextUtils.isEmpty(caption)
@@ -3227,7 +3234,48 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     private boolean shouldEncodeMassgramPremiumCustomEmojiPayload(String message, ArrayList<TLRPC.MessageEntity> entities) {
-        return !TextUtils.isEmpty(message) && getMassgramPremiumTextEntities(entities) != null;
+        return MassgramConfigManager.getInstance().isMassgramFeaturesEnabled()
+            && !TextUtils.isEmpty(message)
+            && getMassgramPremiumTextEntities(entities) != null;
+    }
+
+    private PreparedMassgramEditedText prepareMassgramEditedText(MessageObject messageObject, CharSequence editingMessage, ArrayList<TLRPC.MessageEntity> editingEntities, boolean searchLinks) {
+        if (messageObject == null || editingMessage == null) {
+            return null;
+        }
+        String outgoingMessage = editingMessage.toString();
+        ArrayList<TLRPC.MessageEntity> outgoingEntities = editingEntities;
+        long dialogId = messageObject.getDialogId();
+        MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+        ArrayList<TLRPC.MessageEntity> premiumTextEntities = getMassgramPremiumTextEntities(outgoingEntities);
+        boolean shouldEncodePremiumPayload = shouldEncodeEditedMassgramPremiumText(messageObject, outgoingMessage)
+            || premiumTextEntities != null;
+        if (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(messageObject.messageOwner != null ? messageObject.messageOwner.message : null)) {
+            if (shouldEncodePremiumPayload) {
+                outgoingMessage = MassgramPremiumMessageCodec.encodeText(outgoingMessage, premiumTextEntities);
+                if (outgoingMessage == null) {
+                    return null;
+                }
+                searchLinks = false;
+                outgoingEntities = null;
+            }
+            outgoingMessage = cryptoManager.encryptOutgoingText(dialogId, outgoingMessage);
+            if (outgoingMessage == null) {
+                return null;
+            }
+            searchLinks = false;
+            outgoingEntities = null;
+        } else if (shouldEncodePremiumPayload) {
+            outgoingMessage = MassgramPremiumMessageCodec.encodeText(outgoingMessage, premiumTextEntities);
+            if (outgoingMessage == null) {
+                return null;
+            }
+            searchLinks = false;
+            outgoingEntities = null;
+        } else if (cryptoManager.supportsDialog(dialogId) && !TextUtils.isEmpty(outgoingMessage)) {
+            outgoingMessage = cryptoManager.appendCapabilityMarker(dialogId, outgoingMessage);
+        }
+        return new PreparedMassgramEditedText(outgoingMessage, outgoingEntities, searchLinks);
     }
 
     private ArrayList<TLRPC.MessageEntity> getMassgramPremiumTextEntities(ArrayList<TLRPC.MessageEntity> entities) {
@@ -3267,6 +3315,18 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         return payloadEntities;
     }
 
+    private static final class PreparedMassgramEditedText {
+        private final String message;
+        private final ArrayList<TLRPC.MessageEntity> entities;
+        private final boolean searchLinks;
+
+        private PreparedMassgramEditedText(String message, ArrayList<TLRPC.MessageEntity> entities, boolean searchLinks) {
+            this.message = message;
+            this.entities = entities;
+            this.searchLinks = searchLinks;
+        }
+    }
+
     public int editMessage(MessageObject messageObject, String message, boolean searchLinks, final BaseFragment fragment, ArrayList<TLRPC.MessageEntity> entities, int scheduleDate, int scheduleRepeatPeriod) {
         if (fragment == null || fragment.getParentActivity() == null) {
             return 0;
@@ -3276,39 +3336,13 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             searchLinks = false;
         }
         if (message != null) {
-            long dialogId = messageObject.getDialogId();
-            MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
-            ArrayList<TLRPC.MessageEntity> premiumTextEntities = getMassgramPremiumTextEntities(entities);
-            boolean shouldEncodePremiumPayload = shouldEncodeEditedMassgramPremiumText(messageObject, message)
-                || premiumTextEntities != null;
-            if (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(messageObject.messageOwner != null ? messageObject.messageOwner.message : null)) {
-                String outgoingMessage = message;
-                if (shouldEncodePremiumPayload) {
-                    outgoingMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
-                    if (outgoingMessage == null) {
-                        return 0;
-                    }
-                    searchLinks = false;
-                    entities = null;
-                }
-                String encryptedMessage = cryptoManager.encryptOutgoingText(dialogId, outgoingMessage);
-                if (encryptedMessage == null) {
-                    return 0;
-                }
-                message = encryptedMessage;
-                searchLinks = false;
-                entities = null;
-            } else if (shouldEncodePremiumPayload) {
-                String payloadMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
-                if (payloadMessage == null) {
-                    return 0;
-                }
-                message = payloadMessage;
-                searchLinks = false;
-                entities = null;
-            } else if (cryptoManager.supportsDialog(dialogId) && !TextUtils.isEmpty(message)) {
-                message = cryptoManager.appendCapabilityMarker(dialogId, message);
+            PreparedMassgramEditedText preparedText = prepareMassgramEditedText(messageObject, message, entities, searchLinks);
+            if (preparedText == null) {
+                return 0;
             }
+            message = preparedText.message;
+            entities = preparedText.entities;
+            searchLinks = preparedText.searchLinks;
         }
 
         final TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
@@ -3485,6 +3519,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             return 0;
         }
         int hash = Objects.hash(messageObject.getDialogId(), messageObject.getId(), task.id);
+        int massgramReqId = toggleMassgramTodo(send_as, messageObject, task, enabled, hash, finishRunnable);
+        if (massgramReqId != 0) {
+            return massgramReqId;
+        }
 //        final String key = "todo_" + messageObject.getDialogId() + "_" + messageObject.getId() + "_" + task.id;
 //        if (waitingForCallback.containsKey(key)) {
 //            return 0;
@@ -3501,6 +3539,60 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         return getConnectionsManager().sendRequest(req, (response, error) -> {
             if (error == null) {
                 getMessagesStorage().toggleTodo(messageObject.getDialogId(), messageObject.getId(), task.id, enabled, send_as);
+                getMessagesController().processUpdates((TLRPC.Updates) response, false);
+            }
+            AndroidUtilities.runOnUIThread(() -> {
+                Boolean value = waitingForTodoUpdate.get(hash);
+                if (value != null && value == enabled) {
+                    waitingForTodoUpdate.remove(hash);
+                }
+                if (finishRunnable != null) {
+                    finishRunnable.run();
+                }
+            });
+        });
+    }
+
+    private int toggleMassgramTodo(final long send_as, final MessageObject messageObject, final TLRPC.TodoItem task, final boolean enabled, final int hash, final Runnable finishRunnable) {
+        if (messageObject.messageOwner == null || TextUtils.isEmpty(messageObject.messageOwner.message)) {
+            return 0;
+        }
+        long dialogId = messageObject.getDialogId();
+        MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+        String storedMessage = messageObject.messageOwner.message;
+        String resolvedMessage = cryptoManager.resolveStoredMessageText(dialogId, storedMessage);
+        MassgramPremiumMessageCodec.DecodedPayload payload = MassgramPremiumMessageCodec.decode(resolvedMessage);
+        if (payload == null || payload.todo == null) {
+            return 0;
+        }
+        TLRPC.TL_messageMediaToDo updatedTodo = MassgramPremiumMessageCodec.cloneTodo(payload.todo);
+        if (updatedTodo == null) {
+            return 0;
+        }
+        MessageObject.toggleTodo(currentAccount, send_as, updatedTodo, task.id, enabled, getConnectionsManager().getCurrentTime());
+        String outgoingMessage = MassgramPremiumMessageCodec.encodeTodo(updatedTodo);
+        if (TextUtils.isEmpty(outgoingMessage)) {
+            return 0;
+        }
+        if (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(storedMessage)) {
+            outgoingMessage = cryptoManager.encryptOutgoingText(dialogId, outgoingMessage);
+            if (TextUtils.isEmpty(outgoingMessage)) {
+                return 0;
+            }
+        }
+        waitingForTodoUpdate.put(hash, enabled);
+        final TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
+        req.peer = getMessagesController().getInputPeer(dialogId);
+        req.id = messageObject.getId();
+        req.message = outgoingMessage;
+        req.flags |= 2048;
+        req.no_webpage = true;
+        if (messageObject.messageOwner != null && (messageObject.messageOwner.flags & 1073741824) != 0) {
+            req.quick_reply_shortcut_id = messageObject.messageOwner.quick_reply_shortcut_id;
+            req.flags |= 131072;
+        }
+        return getConnectionsManager().sendRequest(req, (response, error) -> {
+            if (error == null) {
                 getMessagesController().processUpdates((TLRPC.Updates) response, false);
             }
             AndroidUtilities.runOnUIThread(() -> {

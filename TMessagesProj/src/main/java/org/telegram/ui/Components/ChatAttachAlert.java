@@ -96,6 +96,7 @@ import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -4206,7 +4207,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             currentAttachLayout.scrollToTop();
             return;
         }
-        if (layout == todoLayout && !UserConfig.getInstance(currentAccount).isPremium()) {
+        if (layout == todoLayout && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
             new PremiumFeatureBottomSheet(baseFragment, PremiumPreviewFragment.PREMIUM_FEATURE_TODO, false).show();
             return;
         }

@@ -8789,12 +8789,12 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         return user != null && !user.bot && user.id != getUserConfig().getClientUserId();
     }
 
-    private boolean shouldShowMassgramPremiumProfileBadge(TLRPC.User user) {
+    private boolean shouldShowMassgramFeaturesBadge(TLRPC.User user) {
         return user != null
             && !myProfile
             && !isBot
             && user.id != 0
-            && MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+            && MassgramConfigManager.getInstance().isMassgramFeaturesEnabled()
             && MassgramCryptoManager.getInstance(currentAccount).isPeerDetected(user.id);
     }
 
@@ -11280,11 +11280,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         rightIconIsPremium = false;
                         nameTextView[a].setRightDrawable(getEmojiStatusDrawable(user.emoji_status, false, false, a));
                         nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrPremium);
-                    } else if (shouldShowMassgramPremiumProfileBadge(user)) {
-                        rightIconIsStatus = false;
-                        rightIconIsPremium = true;
-                        nameTextView[a].setRightDrawable(getEmojiStatusDrawable(null, false, false, a));
-                        nameTextViewRightDrawableContentDescription = LocaleController.getString(R.string.AccDescrPremium);
                     } else if (getMessagesController().isPremiumUser(user)) {
                         rightIconIsStatus = false;
                         rightIconIsPremium = true;
@@ -13238,6 +13233,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     TextDetailCell detailCell = (TextDetailCell) holder.itemView;
                     boolean containsQr = false;
                     boolean containsGift = false;
+                    boolean containsMassgramBadge = false;
                     if (position == birthdayRow) {
                         TLRPC.UserFull userFull = getMessagesController().getUserFull(userId);
                         if (userFull != null && userFull.birthday != null) {
@@ -13266,7 +13262,13 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             containsGift = !myProfile && today && !getMessagesController().premiumPurchaseBlocked();
                         }
                     } else if (position == massgramClientRow) {
-                        detailCell.setTextAndValue(LocaleController.getString(R.string.MassgramProfileDetectedValue), LocaleController.getString(R.string.MassgramProfileDetected), massgramEncryptionRow != -1);
+                        TLRPC.User user = getMessagesController().getUser(userId);
+                        containsMassgramBadge = shouldShowMassgramFeaturesBadge(user);
+                        detailCell.setTextAndValue(
+                            LocaleController.getString(containsMassgramBadge ? R.string.MassgramProfileDetectedValueFeatures : R.string.MassgramProfileDetectedValue),
+                            LocaleController.getString(R.string.MassgramProfileDetected),
+                            massgramEncryptionRow != -1
+                        );
                     } else if (position == phoneRow) {
                         String text;
                         TLRPC.User user = getMessagesController().getUser(userId);
@@ -13418,6 +13420,11 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                             detailCell.setImage(drawable, LocaleController.getString(R.string.GiftPremium));
                             detailCell.setImageClickListener(ProfileActivity.this::onTextDetailCellImageClicked);
                         }
+                    } else if (containsMassgramBadge) {
+                        Drawable drawable = ContextCompat.getDrawable(detailCell.getContext(), R.drawable.msg_premium_liststar);
+                        drawable.setColorFilter(new PorterDuffColorFilter(dontApplyPeerColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText), false), PorterDuff.Mode.MULTIPLY));
+                        detailCell.setImage(drawable, LocaleController.getString(R.string.MassgramProfileDetectedBadge));
+                        detailCell.setImageClickListener(null);
                     } else if (containsQr) {
                         Drawable drawable = ContextCompat.getDrawable(detailCell.getContext(), R.drawable.header_qr_24);
                         drawable.setColorFilter(new PorterDuffColorFilter(dontApplyPeerColor(getThemedColor(Theme.key_actionBarDefaultIcon), false), PorterDuff.Mode.MULTIPLY));

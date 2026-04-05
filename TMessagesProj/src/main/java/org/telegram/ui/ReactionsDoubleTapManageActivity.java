@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
@@ -173,7 +174,7 @@ public class ReactionsDoubleTapManageActivity extends BaseFragment implements No
         listView.setOnItemClickListener((view, position) -> {
             if (view instanceof AvailableReactionCell) {
                 AvailableReactionCell cell = (AvailableReactionCell) view;
-                if (cell.locked && !getUserConfig().isPremium()) {
+                if (cell.locked && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                     showDialog(new PremiumFeatureBottomSheet(this, PremiumPreviewFragment.PREMIUM_FEATURE_REACTIONS, true));
                     return;
                 }
@@ -344,7 +345,7 @@ public class ReactionsDoubleTapManageActivity extends BaseFragment implements No
         rowCount = 0;
         previewRow = rowCount++;
         infoRow = rowCount++;
-        if (UserConfig.getInstance(currentAccount).isPremium()) {
+        if (MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
             reactionsStartRow = -1;
             premiumReactionRow = rowCount++;
         } else {

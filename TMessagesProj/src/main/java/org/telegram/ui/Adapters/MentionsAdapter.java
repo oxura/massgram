@@ -270,8 +270,7 @@ public class MentionsAdapter extends RecyclerListView.SelectionAdapter implement
         if (stickersMap != null && stickersMap.containsKey(key)) {
             return;
         }
-        if (!UserConfig.getInstance(currentAccount).isPremium()
-            && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+        if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)
             && MessageObject.isPremiumSticker(document)) {
             return;
         }
@@ -297,8 +296,7 @@ public class MentionsAdapter extends RecyclerListView.SelectionAdapter implement
             if (stickersMap != null && stickersMap.containsKey(key)) {
                 continue;
             }
-            if (!UserConfig.getInstance(currentAccount).isPremium()
-                && !MassgramConfigManager.getInstance().isPremiumUnlockEnabled()
+            if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)
                 && MessageObject.isPremiumSticker(document)) {
                 continue;
             }

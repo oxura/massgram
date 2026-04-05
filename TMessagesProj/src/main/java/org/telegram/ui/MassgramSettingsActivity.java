@@ -62,12 +62,14 @@ public class MassgramSettingsActivity extends UniversalFragment {
     private static final int BUTTON_DISABLE_LOCAL_STATS = 9;
     private static final int BUTTON_OWNER_STATS = 10;
     private static final int BUTTON_UNLOCK_PREMIUM = 11;
+    private static final int BUTTON_SHOW_VOICE_PITCH_BUTTON = 12;
 
     private final HashSet<Integer> expandedInfoRows = new HashSet<>();
 
     private LinearLayout settingsContentView;
     private LanguagePillView languagePillView;
     private MassgramSettingRow liquidGlassRow;
+    private MassgramSettingRow voicePitchButtonRow;
     private MassgramSettingRow ghostModeRow;
     private MassgramSettingRow saveDeletedRow;
     private MassgramSettingRow relayCallsRow;
@@ -144,7 +146,9 @@ public class MassgramSettingsActivity extends UniversalFragment {
         settingsContentView.addView(createSectionHeader(context, R.string.MassgramSettingsAppearance));
         LinearLayout appearanceCard = createSectionCard(context);
         liquidGlassRow = new MassgramSettingRow(context, R.drawable.msg_theme);
+        voicePitchButtonRow = new MassgramSettingRow(context, R.drawable.msg_speed);
         appearanceCard.addView(liquidGlassRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        appearanceCard.addView(voicePitchButtonRow, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         settingsContentView.addView(appearanceCard, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         settingsContentView.addView(createSpacer(context, 14));
@@ -214,8 +218,21 @@ public class MassgramSettingsActivity extends UniversalFragment {
             LocaleController.getString(glassSupported ? R.string.MassgramLiquidGlassInfo : R.string.MassgramLiquidGlassUnsupported),
             LiteMode.isEnabledSetting(LiteMode.FLAG_LIQUID_GLASS),
             glassSupported,
-            true,
+            false,
             this::toggleLiquidGlass
+        );
+        bindRow(
+            voicePitchButtonRow,
+            BUTTON_SHOW_VOICE_PITCH_BUTTON,
+            LocaleController.getString(R.string.MassgramVoicePitchButton),
+            LocaleController.getString(R.string.MassgramVoicePitchButtonInfo),
+            configManager.isVoicePitchButtonVisible(),
+            true,
+            true,
+            () -> {
+                configManager.setVoicePitchButtonVisible(!configManager.isVoicePitchButtonVisible());
+                refreshSettingsState();
+            }
         );
         bindRow(
             ghostModeRow,
@@ -300,12 +317,12 @@ public class MassgramSettingsActivity extends UniversalFragment {
             BUTTON_UNLOCK_PREMIUM,
             LocaleController.getString(R.string.MassgramUnlockPremium),
             LocaleController.getString(R.string.MassgramUnlockPremiumInfo),
-            configManager.isPremiumUnlockEnabled(),
+            configManager.isMassgramFeaturesEnabled(),
             true,
             true,
             () -> {
-                boolean newValue = !configManager.isPremiumUnlockEnabled();
-                configManager.setPremiumUnlockEnabled(newValue);
+                boolean newValue = !configManager.isMassgramFeaturesEnabled();
+                configManager.setMassgramFeaturesEnabled(newValue);
                 refreshSettingsState();
             }
         );

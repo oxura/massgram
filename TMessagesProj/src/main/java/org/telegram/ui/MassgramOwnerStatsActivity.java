@@ -6,6 +6,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -48,6 +49,7 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
     private LinearLayout contentLayout;
     private TextView statusView;
     private StatsCard overviewCard;
+    private StatsCard problemsCard;
     private StatsCard usersCard;
     private StatsCard releasesCard;
     private StatsCard repositoryCard;
@@ -84,6 +86,7 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
         contentLayout.addView(statusView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         overviewCard = addSection(context, R.string.MassgramOwnerOverview);
+        problemsCard = addSection(context, R.string.MassgramOwnerProblems);
         usersCard = addSection(context, R.string.MassgramOwnerUsersSection);
         releasesCard = addSection(context, R.string.MassgramOwnerReleaseChannel);
         repositoryCard = addSection(context, R.string.MassgramOwnerRepository);
@@ -136,6 +139,17 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
             add(new RowData(LocaleController.getString(R.string.MassgramOwnerOfflineUsers), "—"));
             add(new RowData(LocaleController.getString(R.string.MassgramOwnerBetaUsers), "—"));
         }});
+        problemsCard.setRows(new ArrayList<RowData>() {{
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerCrashUsers24h), "\u2014"));
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerNewIssues24h), "\u2014"));
+            add(new RowData(LocaleController.getString(R.string.MassgramOwnerTopIssue), "\u2014"));
+            add(new RowData(
+                LocaleController.getString(R.string.MassgramOwnerIssuesInbox),
+                LocaleController.getString(R.string.Open),
+                LocaleController.getString(R.string.MassgramOwnerIssuesInfo),
+                () -> presentFragment(new MassgramIssuesActivity())
+            ));
+        }});
         usersCard.setRows(new ArrayList<RowData>() {{
             add(new RowData(
                 LocaleController.getString(R.string.MassgramKnownUsers),
@@ -157,6 +171,7 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
     private void loadStats() {
         bindLoading(LocaleController.getString(R.string.MassgramOwnerStatsLoading));
         loadDashboardStats();
+        loadIssuesStats();
         loadRepositoryStats();
     }
 
@@ -178,6 +193,29 @@ public class MassgramOwnerStatsActivity extends BaseFragment {
                     add(new RowData(LocaleController.getString(R.string.MassgramOwnerBetaUsers), formatCount(data.betaUsers)));
                 }});
             }
+        });
+    }
+
+    private void loadIssuesStats() {
+        MassgramTelemetryManager.getInstance().loadOwnerIssues(getUserConfig().getClientUserId(), "", true, (data, error) -> {
+            if (getParentActivity() == null || data == null || error != null) {
+                return;
+            }
+            problemsCard.setRows(new ArrayList<RowData>() {{
+                add(new RowData(LocaleController.getString(R.string.MassgramOwnerCrashUsers24h), formatCount(data.summary.crashUsers24h)));
+                add(new RowData(LocaleController.getString(R.string.MassgramOwnerNewIssues24h), formatCount(data.summary.newIssues24h)));
+                add(new RowData(
+                    LocaleController.getString(R.string.MassgramOwnerTopIssue),
+                    !TextUtils.isEmpty(data.summary.topTitle) ? data.summary.topTitle : LocaleController.getString(R.string.MassgramOwnerIssueNone),
+                    !TextUtils.isEmpty(data.summary.topFingerprint) ? data.summary.topFingerprint : null
+                ));
+                add(new RowData(
+                    LocaleController.getString(R.string.MassgramOwnerIssuesInbox),
+                    LocaleController.getString(R.string.Open),
+                    LocaleController.getString(R.string.MassgramOwnerIssuesInfo),
+                    () -> presentFragment(new MassgramIssuesActivity())
+                ));
+            }});
         });
     }
 

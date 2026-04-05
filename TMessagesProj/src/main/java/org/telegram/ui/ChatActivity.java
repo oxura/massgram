@@ -166,6 +166,7 @@ import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MassgramPremiumMessageCodec;
+import org.telegram.messenger.MassgramTelemetryManager;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -933,6 +934,7 @@ public class ChatActivity extends BaseFragment implements
     private boolean loadingForward;
     private MessageObject unreadMessageObject;
     private MessageObject scrollToMessage;
+    private ChatScrollAnchorHelper.MessageAnchor scrollToMessageAnchor;
     public int highlightMessageId = Integer.MAX_VALUE;
     public boolean showNoQuoteAlert;
     public boolean highlightMessageQuoteFirst;
@@ -10424,10 +10426,13 @@ public class ChatActivity extends BaseFragment implements
             sideControlsButtonsLayout.setButtonLoading(ChatActivitySideControlsButtonsLayout.BUTTON_PAGE_DOWN, true, true);
         };
         if (createUnreadMessageAfterId != 0) {
+            recordChatBreadcrumb("jump_to_bottom", "jump_reason", "create_unread_after", "target_message_id", createUnreadMessageAfterId);
             scrollToMessageId(createUnreadMessageAfterId, 0, false, returnToLoadIndex, true, 0, null, inCaseLoading);
         } else if (returnToMessageId > 0) {
+            recordChatBreadcrumb("jump_to_bottom", "jump_reason", "return_to_message", "target_message_id", returnToMessageId);
             scrollToMessageId(returnToMessageId, 0, true, returnToLoadIndex, true, 0, null, inCaseLoading);
         } else {
+            recordChatBreadcrumb("jump_to_bottom", "jump_reason", "last_message");
             scrollToLastMessage(true, true, inCaseLoading);
             if (!pinnedMessageIds.isEmpty()) {
                 forceScrollToFirst = true;
@@ -15161,6 +15166,43 @@ public class ChatActivity extends BaseFragment implements
         }
     }
 
+    private void setScrollToMessage(MessageObject messageObject) {
+        scrollToMessage = messageObject;
+        if (messageObject != null) {
+            scrollToMessageAnchor = ChatScrollAnchorHelper.MessageAnchor.of(messageObject.getDialogId(), messageObject.getId());
+        } else {
+            scrollToMessageAnchor = null;
+        }
+    }
+
+    private int findScrollToMessageIndex() {
+        return ChatScrollAnchorHelper.findAnchorIndex(
+            messages,
+            scrollToMessage,
+            scrollToMessageAnchor,
+            MessageObject::getId,
+            MessageObject::getDialogId
+        );
+    }
+
+    private boolean scrollToResolvedAnchor(int yOffset, boolean bottom) {
+        int index = findScrollToMessageIndex();
+        if (index < 0) {
+            return false;
+        }
+        chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + index, yOffset, bottom);
+        return true;
+    }
+
+    private void replaceScrollAnchors(MessageObject oldMessageObject, MessageObject newMessageObject) {
+        if (scrollToMessage == oldMessageObject) {
+            setScrollToMessage(newMessageObject);
+        }
+        if (unreadMessageObject == oldMessageObject) {
+            unreadMessageObject = newMessageObject;
+        }
+    }
+
     private void moveScrollToLastMessage(boolean skipSponsored) {
         if (chatListView != null && !messages.isEmpty() && !pinchToZoomHelper.isInOverlayMode()) {
             int position = 0;
@@ -15269,8 +15311,15 @@ public class ChatActivity extends BaseFragment implements
 
     public void scrollToLastMessage(boolean skipSponsored, boolean top, Runnable inCaseLoading) {
         if (chatListView.isFastScrollAnimationRunning()) {
+            recordChatBreadcrumb("scroll_to_last_message", "fast_scroll_animation_running", true);
             return;
         }
+        recordChatBreadcrumb("scroll_to_last_message",
+            "skip_sponsored", skipSponsored,
+            "top", top,
+            "forward_end_reached", forwardEndReached[0],
+            "first_unread_id", first_unread_id,
+            "start_load_from_message_id", startLoadFromMessageId);
         forceNextPinnedMessageId = 0;
         nextScrollToMessageId = 0;
         forceScrollToFirst = false;
@@ -15285,17 +15334,11 @@ public class ChatActivity extends BaseFragment implements
             } else {
                 chatAdapter.updateRowsSafe();
                 chatScrollHelperCallback.scrollTo = null;
-                int position = 0;
-                if (skipSponsored) {
-                    while (position < messages.size()) {
-                        if (!messages.get(position).isSponsored()) {
-                            break;
-                        }
-                        position++;
-                        top = false;
-                    }
+                int position = ChatScrollAnchorHelper.resolveBottomPosition(messages, skipSponsored, MessageObject::isSponsored);
+                if (skipSponsored && position > 0) {
+                    top = false;
                 }
-                if (top && messages != null && !messages.isEmpty() && messages.get(position) != null) {
+                if (position >= 0 && top && messages != null && !messages.isEmpty() && messages.get(position) != null) {
                     long groupId = messages.get(position).getGroupId();
                     while (groupId != 0 && position + 1 < messages.size()) {
                         if (groupId != messages.get(position + 1).getGroupId()) {
@@ -15304,7 +15347,7 @@ public class ChatActivity extends BaseFragment implements
                         position++;
                     }
                 }
-                if (messages != null && !messages.isEmpty()) {
+                if (position >= 0 && messages != null && !messages.isEmpty()) {
                     position = Math.min(position, messages.size() - 1);
                 }
                 final int finalPosition = position;
@@ -16393,6 +16436,15 @@ public class ChatActivity extends BaseFragment implements
                 });
             }
             return;
+        }
+        if (shouldRecordScrollToMessageBreadcrumb(id, fromMessageId, forceScroll)) {
+            recordChatBreadcrumb("scroll_to_message",
+                "target_message_id", id,
+                "from_message_id", fromMessageId,
+                "select", select,
+                "load_index", loadIndex,
+                "force_scroll", forceScroll,
+                "force_pinned_message_id", forcePinnedMessageId);
         }
 
         forceNextPinnedMessageId = Math.abs(forcePinnedMessageId);
@@ -20794,9 +20846,9 @@ public class ChatActivity extends BaseFragment implements
                             dateObj.stableId = lastStableId++;
                             messages.add(messages.size() - 1, dateObj);
                             unreadMessageObject = dateObj;
-                            scrollToMessage = unreadMessageObject;
+                            setScrollToMessage(unreadMessageObject);
                         } else {
-                            scrollToMessage = obj;
+                            setScrollToMessage(obj);
                         }
                         scrollToMessagePosition = -10000;
                         scrolledToUnread = true;
@@ -20812,7 +20864,7 @@ public class ChatActivity extends BaseFragment implements
                     if (showScrollToMessageError && messageId != startLoadFromMessageId) {
                         BulletinFactory.of(this).createErrorBulletin(LocaleController.getString(R.string.MessageNotFound), themeDelegate).show();
                     }
-                    scrollToMessage = obj;
+                    setScrollToMessage(obj);
                     if (postponedScroll) {
                         postponedScrollMessageId = scrollToMessage.getId();
                     }
@@ -20838,7 +20890,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                     unreadMessageObject = dateObj;
                     if (load_type == 3) {
-                        scrollToMessage = unreadMessageObject;
+                        setScrollToMessage(unreadMessageObject);
                         startLoadFromMessageId = 0;
                         scrollToMessagePosition = -9000;
                     }
@@ -20923,14 +20975,14 @@ public class ChatActivity extends BaseFragment implements
                 if (chatListView != null && chatScrollHelper != null) {
                     if (chatAdapter.isFiltered) {
                         scrollToMessagePosition = -10000;
-                        scrollToMessage = null;
+                        setScrollToMessage(null);
                     } else if (first || scrollToTopOnResume || forceScrollToTop) {
                         forceScrollToTop = false;
                         if (!universalNotify && !postponedScroll && chatAdapter != null) {
                             chatAdapter.notifyDataSetChanged(true);
                         }
                         if (isTopic && startLoadFromMessageId == getTopicId() && messArr.size() > 0 && messages.size() > 0 && messArr.size() - 1 < messages.size()) {
-                            scrollToMessage = messages.get(messArr.size() - 1);
+                            setScrollToMessage(messages.get(messArr.size() - 1));
                         }
                         if (scrollToMessage != null) {
                             addSponsoredMessages(!isFirstLoading);
@@ -20963,7 +21015,9 @@ public class ChatActivity extends BaseFragment implements
                                     if (chatAdapter.loadingUpRow >= 0 && !messages.isEmpty() && (messages.get(messages.size() - 1) == scrollToMessage || messages.get(messages.size() - 2) == scrollToMessage)) {
                                         chatLayoutManager.scrollToPositionWithOffset(chatAdapter.loadingUpRow, yOffset, bottom);
                                     } else {
-                                        chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + messages.indexOf(scrollToMessage), yOffset, bottom);
+                                        if (!scrollToResolvedAnchor(yOffset, bottom)) {
+                                            moveScrollToLastMessage(false);
+                                        }
                                     }
                                 }
                             }
@@ -20981,7 +21035,7 @@ public class ChatActivity extends BaseFragment implements
                                 }
                             }
                             scrollToMessagePosition = -10000;
-                            scrollToMessage = null;
+                            setScrollToMessage(null);
                         } else if (!fakePostponedScroll) {
                             addSponsoredMessages(!isFirstLoading);
                             moveScrollToLastMessage(true);
@@ -25194,7 +25248,7 @@ public class ChatActivity extends BaseFragment implements
                                 chatAdapter.notifyItemInserted(chatAdapter.messagesStartRow + 0);
                             }
                             unreadMessageObject = dateObj;
-                            scrollToMessage = unreadMessageObject;
+                            setScrollToMessage(unreadMessageObject);
                             scrollToMessagePosition = -10000;
                             scrollToTopUnReadOnResume = true;
                         }
@@ -25950,6 +26004,7 @@ public class ChatActivity extends BaseFragment implements
                 if (messageObject.type >= 0) {
                     messageObject.reactionsChanged |= old.isBotPendingDraft && !messageObject.isBotPendingDraft;
                     messageObject.copyStableParams(old);
+                    replaceScrollAnchors(old, messageObject);
                     messages.set(index, messageObject);
                     if (chatAdapter != null && !chatAdapter.isFiltered) {
                         chatAdapter.updateRowAtPosition(chatAdapter.messagesStartRow + index);
@@ -28909,6 +28964,7 @@ public class ChatActivity extends BaseFragment implements
     @Override
     public void onResume() {
         super.onResume();
+        recordChatBreadcrumb("open_chat");
         checkShowBlur(false);
         activityResumeTime = System.currentTimeMillis();
         if (openImport && getSendMessagesHelper().getImportingHistory(dialog_id) != null) {
@@ -28983,14 +29039,16 @@ public class ChatActivity extends BaseFragment implements
                     } else {
                         yOffset = scrollToMessagePosition;
                     }
-                    chatLayoutManager.scrollToPositionWithOffset(chatAdapter.messagesStartRow + messages.indexOf(scrollToMessage), yOffset, bottom);
+                    if (!scrollToResolvedAnchor(yOffset, bottom)) {
+                        moveScrollToLastMessage(false);
+                    }
                 }
             } else {
                 moveScrollToLastMessage(false);
             }
             scrollToTopUnReadOnResume = false;
             scrollToTopOnResume = false;
-            scrollToMessage = null;
+            setScrollToMessage(null);
         }
 
         paused = false;
@@ -29056,6 +29114,56 @@ public class ChatActivity extends BaseFragment implements
         } else {
             AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid);
         }
+    }
+
+    private boolean shouldRecordScrollToMessageBreadcrumb(int id, int fromMessageId, boolean forceScroll) {
+        return forceScroll
+            || fromMessageId != 0
+            || id == first_unread_id
+            || id == createUnreadMessageAfterId
+            || id == returnToMessageId;
+    }
+
+    private void recordChatBreadcrumb(String action, Object... extraValues) {
+        HashMap<String, Object> context = new HashMap<>();
+        context.put("dialog_id", dialog_id);
+        if (threadMessageId != 0) {
+            context.put("thread_message_id", threadMessageId);
+        }
+        if (chatMode != 0) {
+            context.put("chat_mode", chatMode);
+        }
+        if (isTopic) {
+            context.put("is_topic", true);
+        }
+        if (first_unread_id != 0) {
+            context.put("first_unread_id", first_unread_id);
+        }
+        if (createUnreadMessageAfterId != 0) {
+            context.put("create_unread_after_id", createUnreadMessageAfterId);
+        }
+        if (returnToMessageId != 0) {
+            context.put("return_to_message_id", returnToMessageId);
+        }
+        if (newMentionsCount > 0) {
+            context.put("mentions_count", newMentionsCount);
+        }
+        if (reactionsMentionCount > 0) {
+            context.put("reaction_mentions_count", reactionsMentionCount);
+        }
+        if (messages != null && !messages.isEmpty()) {
+            context.put("loaded_messages_count", messages.size());
+        }
+        if (extraValues != null) {
+            for (int i = 0; i + 1 < extraValues.length; i += 2) {
+                Object key = extraValues[i];
+                Object value = extraValues[i + 1];
+                if (key instanceof String && value != null) {
+                    context.put((String) key, value);
+                }
+            }
+        }
+        MassgramTelemetryManager.getInstance().recordBreadcrumb("ChatActivity", action, context);
     }
 
     @Override
@@ -31021,7 +31129,7 @@ public class ChatActivity extends BaseFragment implements
                 final boolean tags = getUserConfig().getClientUserId() == getDialogId();
                 reactionsLayout = new ReactionsContainerLayout(tags ? ReactionsContainerLayout.TYPE_TAGS : ReactionsContainerLayout.TYPE_DEFAULT, ChatActivity.this, contentView.getContext(), currentAccount, getResourceProvider());
                 if (tags) {
-                    reactionsLayout.setHint(getUserConfig().isPremium() ? LocaleController.getString(R.string.SavedTagReactionsHint2) : AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.SavedTagReactionsPremiumHint), Theme.key_windowBackgroundWhiteBlueText2, 0, () -> {
+                    reactionsLayout.setHint(MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) ? LocaleController.getString(R.string.SavedTagReactionsHint2) : AndroidUtilities.replaceSingleTag(LocaleController.getString(R.string.SavedTagReactionsPremiumHint), Theme.key_windowBackgroundWhiteBlueText2, 0, () -> {
                         closeMenu(false);
                         PremiumFeatureBottomSheet sheet = new PremiumFeatureBottomSheet(ChatActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_SAVED_TAGS, true);
                         sheet.setDimBehind(false);
@@ -31690,7 +31798,7 @@ public class ChatActivity extends BaseFragment implements
     Runnable updateReactionRunnable;
 
     private void showMultipleReactionsPromo(View cell, ReactionsLayoutInBubble.VisibleReaction visibleReaction, int currentChosenReactions) {
-        if (SharedConfig.multipleReactionsPromoShowed || cell == null || visibleReaction == null || getUserConfig().isPremium()) {
+        if (SharedConfig.multipleReactionsPromoShowed || cell == null || visibleReaction == null || MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
             return;
         }
         if (currentChosenReactions == 1) {
@@ -34233,11 +34341,10 @@ public class ChatActivity extends BaseFragment implements
 
     public void sendTodo(TLRPC.TL_messageMediaToDo todo, boolean notify, int scheduleDate, long payStars) {
         if (checkSlowModeAlert()) {
-            if (MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
-                String todoText = buildMassgramTodoText(todo);
-                if (!TextUtils.isEmpty(todoText)) {
-                    final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of(todoText, dialog_id, replyingMessageObject, getThreadMessage(), null, false, null, null, null, notify, scheduleDate, 0, null, false);
-                    params2.forceMassgramPremiumTextPayload = true;
+            if (MassgramConfigManager.getInstance().isMassgramFeaturesEnabled()) {
+                String todoPayload = MassgramPremiumMessageCodec.encodeTodo(todo);
+                if (!TextUtils.isEmpty(todoPayload)) {
+                    final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of(todoPayload, dialog_id, replyingMessageObject, getThreadMessage(), null, false, null, null, null, notify, scheduleDate, 0, null, false);
                     params2.quick_reply_shortcut = quickReplyShortcut;
                     params2.quick_reply_shortcut_id = getQuickReplyId();
                     params2.payStars = payStars;
@@ -34245,8 +34352,8 @@ public class ChatActivity extends BaseFragment implements
                     params2.suggestionParams = messageSuggestionParams;
                     getSendMessagesHelper().sendMessage(params2);
                     afterMessageSend();
+                    return;
                 }
-                return;
             }
             final SendMessagesHelper.SendMessageParams params2 = SendMessagesHelper.SendMessageParams.of((TLRPC.TL_messageMediaPoll) null, dialog_id, replyingMessageObject, getThreadMessage(), null, null, notify, scheduleDate, 0);
             params2.todo = todo;
@@ -34258,32 +34365,6 @@ public class ChatActivity extends BaseFragment implements
             getSendMessagesHelper().sendMessage(params2);
             afterMessageSend();
         }
-    }
-
-    private String buildMassgramTodoText(TLRPC.TL_messageMediaToDo todo) {
-        if (todo == null || todo.todo == null) {
-            return LocaleController.getString(R.string.MessageTodo);
-        }
-        StringBuilder builder = new StringBuilder();
-        if (todo.todo.title != null && !TextUtils.isEmpty(todo.todo.title.text)) {
-            builder.append(todo.todo.title.text.trim());
-        }
-        if (todo.todo.list != null) {
-            for (int i = 0; i < todo.todo.list.size(); i++) {
-                TLRPC.TodoItem item = todo.todo.list.get(i);
-                if (item == null || item.title == null || TextUtils.isEmpty(item.title.text)) {
-                    continue;
-                }
-                if (builder.length() > 0) {
-                    builder.append('\n');
-                }
-                builder.append("- [ ] ").append(item.title.text.trim());
-            }
-        }
-        if (builder.length() == 0) {
-            return LocaleController.getString(R.string.MessageTodo);
-        }
-        return builder.toString();
     }
 
     public void sendMedia(MediaController.PhotoEntry photoEntry, VideoEditedInfo videoEditedInfo, boolean notify, int scheduleDate, int scheduleRepeatPeriod, boolean forceDocument, long stars) {

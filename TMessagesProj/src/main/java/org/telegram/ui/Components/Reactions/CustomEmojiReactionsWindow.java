@@ -42,6 +42,7 @@ import org.telegram.messenger.AnimationNotificationsLocker;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -206,7 +207,7 @@ public class CustomEmojiReactionsWindow {
 
             @Override
             protected void onEmojiSelected(View emojiView, Long documentId, TLRPC.Document document, TL_stars.TL_starGiftUnique gift, Integer until) {
-                if (baseFragment != null && !reactionsContainerLayout.channelReactions && reactionsContainerLayout.getWindowType() != SelectAnimatedEmojiDialog.TYPE_STICKER_SET_EMOJI && !UserConfig.getInstance(baseFragment.getCurrentAccount()).isPremium()) {
+                if (baseFragment != null && !reactionsContainerLayout.channelReactions && reactionsContainerLayout.getWindowType() != SelectAnimatedEmojiDialog.TYPE_STICKER_SET_EMOJI && !MassgramConfigManager.getInstance().canUsePremiumFeatures(baseFragment.getCurrentAccount())) {
                     try {
                         windowView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                     } catch (Exception ignored) {}

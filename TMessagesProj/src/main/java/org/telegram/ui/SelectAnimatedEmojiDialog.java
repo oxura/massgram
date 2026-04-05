@@ -81,6 +81,7 @@ import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
@@ -969,7 +970,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                     } catch (Exception ignored) {}
                     ImageViewEmoji imageViewEmoji = (ImageViewEmoji) view;
-                    if (!imageViewEmoji.isDefaultReaction && !UserConfig.getInstance(currentAccount).isPremium()) {
+                    if (!imageViewEmoji.isDefaultReaction && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                         TLRPC.Document document = imageViewEmoji.span.document;
                         if (document == null) {
                             document = AnimatedEmojiDrawable.findDocument(currentAccount, imageViewEmoji.span.documentId);
@@ -2305,7 +2306,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                     imageView.setDrawable(drawable);
                 }
 
-                if (!UserConfig.getInstance(currentAccount).isPremium() && type == TYPE_EFFECTS && currentReaction.isEffect && currentReaction.premium) {
+                if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) && type == TYPE_EFFECTS && currentReaction.isEffect && currentReaction.premium) {
                     imageView.createPremiumLockView();
                     imageView.premiumLockIconView.setVisibility(View.VISIBLE);
                     imageView.setEmojicon(null);
@@ -2340,7 +2341,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                     } else {
                         documentId = visibleReaction.documentId;
                     }
-                    if (type == TYPE_EFFECTS && visibleReaction != null && !UserConfig.getInstance(currentAccount).isPremium() && visibleReaction.isEffect && visibleReaction.premium) {
+                    if (type == TYPE_EFFECTS && visibleReaction != null && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) && visibleReaction.isEffect && visibleReaction.premium) {
                         imageView.createPremiumLockView();
                         imageView.premiumLockIconView.setVisibility(View.VISIBLE);
                     } else {
@@ -2621,7 +2622,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                     }
                     boolean lock = false;
                     if (type != TYPE_SET_REPLY_ICON && type != TYPE_SET_REPLY_ICON_BOTTOM && type != TYPE_CHAT_REACTIONS) {
-                        lock = !pack.free && !UserConfig.getInstance(currentAccount).isPremium();
+                        lock = !pack.free && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount);
                     }
                     header.setText(pack.set.title, lock);
                 } else {
@@ -2693,7 +2694,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                     imageView.setDrawable(drawable);
                 }
 
-                if (!UserConfig.getInstance(currentAccount).isPremium() && type == TYPE_EFFECTS && currentReaction.isEffect && currentReaction.premium) {
+                if (!MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) && type == TYPE_EFFECTS && currentReaction.isEffect && currentReaction.premium) {
                     imageView.createPremiumLockView();
                     imageView.premiumLockIconView.setVisibility(View.VISIBLE);
                     imageView.setEmojicon(null);
@@ -2732,8 +2733,8 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                 if (packIndex >= 0 && packIndex < packs.size()) {
                     EmojiView.EmojiPack pack = packs.get(packIndex);
                     if (pack != null) {
-                        button.set(pack.set.title, !pack.free && !UserConfig.getInstance(currentAccount).isPremium(), pack.installed, e -> {
-                            if (!pack.free && !UserConfig.getInstance(currentAccount).isPremium()) {
+                        button.set(pack.set.title, !pack.free && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount), pack.installed, e -> {
+                            if (!pack.free && !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                                 BaseFragment fragment = LaunchActivity.getLastFragment();
                                 if (fragment != null) {
                                     fragment.showDialog(new PremiumFeatureBottomSheet(baseFragment, getContext(), currentAccount, PremiumPreviewFragment.PREMIUM_FEATURE_ANIMATED_EMOJI, false));
@@ -3825,7 +3826,7 @@ public class SelectAnimatedEmojiDialog extends FrameLayout implements Notificati
                 if (type == TYPE_EFFECTS) {
 
                 } else if (allRecentReactionsIsDefault) {
-                    if (UserConfig.getInstance(currentAccount).isPremium()) {
+                    if (MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
                         popularSectionRow = totalCount++;
                         rowHashCodes.add(5L);
                     }

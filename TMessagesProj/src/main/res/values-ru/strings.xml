@@ -272,6 +272,8 @@
     <string name="MassgramLiquidGlass">Liquid glass</string>
     <string name="MassgramLiquidGlassInfo">Включает стеклянные полупрозрачные поверхности и blur-интерфейс Massgram на поддерживаемых устройствах. Интерфейс обновляется сразу после переключения.</string>
     <string name="MassgramLiquidGlassUnsupported">Liquid glass требует Android 13+ и как минимум среднего класса производительности на этом устройстве.</string>
+    <string name="MassgramVoicePitchButton">Показывать кнопку тона голоса</string>
+    <string name="MassgramVoicePitchButtonInfo">Показывает быстрый доступ к изменению голоса рядом с микрофоном. Выключи его, чтобы вернуть стандартную раскладку Telegram.</string>
     <string name="MassgramGhostMode">Режим призрака</string>
     <string name="MassgramGhostModeInfo">Блокирует статусы online, last seen, typing и подтверждения прочтения, сохраняя входящие сообщения и обновления в реальном времени.</string>
     <string name="MassgramSaveDeletedMessages">Сохранять удалённые сообщения</string>
@@ -284,8 +286,8 @@
     <string name="MassgramBlockSponsoredInfo">Скрывает спонсируемые сообщения в поддерживаемых чатах и оставляет рекламный кэш пустым на этом клиенте.</string>
     <string name="MassgramDisableLocalStats">Отключить локальную статистику</string>
     <string name="MassgramDisableLocalStatsInfo">Перестаёт собирать внутри Massgram локальные счётчики трафика и медиа. Уже сохранённые данные не очищаются.</string>
-    <string name="MassgramUnlockPremium">Премиум-сообщения Massgram</string>
-    <string name="MassgramUnlockPremiumInfo">Отправляет премиум-сообщения только для Massgram. Обычные клиенты Telegram видят только "Unsupported Massgram message", а Massgram локально декодирует скрытое содержимое.</string>
+    <string name="MassgramUnlockPremium">Функции Massgram+</string>
+    <string name="MassgramUnlockPremiumInfo">Включает Massgram-only стикеры, кастомные эмодзи и списки задач. Обычные клиенты Telegram видят только "Unsupported Massgram message", когда используется транспорт Massgram, а Massgram локально декодирует и показывает скрытое содержимое.</string>
     <string name="MassgramDownloadSpeedLimitedMessage">Локальное ускорение Massgram уже включено. Сейчас Telegram ограничивает скорость этой загрузки на стороне сервера.</string>
     <string name="MassgramUploadSpeedLimitedMessage">Локальное ускорение Massgram уже включено. Сейчас Telegram ограничивает скорость этой отправки на стороне сервера.</string>
     <string name="MassgramCheckUpdates">Проверить обновления</string>
@@ -360,6 +362,8 @@
     <string name="MassgramOwnerStatusOffline">Massgram оффлайн</string>
     <string name="MassgramProfileDetected">Massgram</string>
     <string name="MassgramProfileDetectedValue">Клиент Massgram обнаружен</string>
+    <string name="MassgramProfileDetectedValueFeatures">Клиент Massgram обнаружен • Massgram+ доступен</string>
+    <string name="MassgramProfileDetectedBadge">Функции Massgram+ доступны</string>
     <string name="MassgramProfileEncryption">Локальное шифрование</string>
     <string name="MassgramProfileEncryptionEnabledBulletin">Локальное шифрование включено</string>
     <string name="MassgramProfileEncryptionDisabledBulletin">Локальное шифрование выключено</string>

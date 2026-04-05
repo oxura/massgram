@@ -91,6 +91,7 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramTelemetryManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
@@ -736,6 +737,20 @@ public abstract class BotWebViewContainer extends FrameLayout implements Notific
     public void onSettingsButtonPressed() {
         lastClickMs = System.currentTimeMillis();
         notifyEvent("settings_button_pressed", null);
+    }
+
+    private void captureRendererCrash(String screen, RenderProcessGoneDetail detail, boolean popupWebView) {
+        HashMap<String, Object> context = new HashMap<>();
+        context.put("popup_webview", popupWebView);
+        context.put("current_account", currentAccount);
+        if (botUser != null) {
+            context.put("bot_id", botUser.id);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null) {
+            context.put("did_crash", detail.didCrash());
+            context.put("renderer_priority", detail.rendererPriorityAtExit());
+        }
+        MassgramTelemetryManager.getInstance().captureRendererCrash(screen, 0L, "WebView render process gone", context);
     }
 
     public void onMainButtonPressed() {
@@ -3809,6 +3824,9 @@ public abstract class BotWebViewContainer extends FrameLayout implements Notific
 
                 @Override
                 public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                    if (botWebViewContainer != null) {
+                        botWebViewContainer.captureRendererCrash("bot_webview", detail, false);
+                    }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         d("onRenderProcessGone priority=" + (detail == null ? null : detail.rendererPriorityAtExit()) + " didCrash=" + (detail == null ? null : detail.didCrash()));
                     } else {
@@ -4243,6 +4261,9 @@ public abstract class BotWebViewContainer extends FrameLayout implements Notific
                         newWebView.setWebViewClient(new WebViewClient() {
                             @Override
                             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                                if (botWebViewContainer != null) {
+                                    botWebViewContainer.captureRendererCrash("bot_webview_popup", detail, true);
+                                }
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                     d("newWebView.onRenderProcessGone priority=" + (detail == null ? null : detail.rendererPriorityAtExit()) + " didCrash=" + (detail == null ? null : detail.didCrash()));
                                 } else {

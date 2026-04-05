@@ -2570,6 +2570,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.updateBotMenuButton);
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.didUpdatePremiumGiftFieldIcon);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiLoaded);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.massgramSettingsChanged);
 
         parentActivity = context;
         parentFragment = fragment;
@@ -3087,11 +3088,11 @@ public class ChatActivityEnterView extends FrameLayout implements
 
         voicePitchButton = new ImageView(context);
         voicePitchButton.setScaleType(ImageView.ScaleType.CENTER);
-        voicePitchButton.setImageResource(R.drawable.msg_speed_medium);
+        voicePitchButton.setImageResource(R.drawable.msg_speed);
         voicePitchButton.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_CIRCLE_20DP));
         voicePitchButton.setContentDescription(getString(R.string.MassgramVoicePitchTitle));
         voicePitchButton.setOnClickListener(v -> showMassgramVoicePitchSheet());
-        textFieldContainer.addView(voicePitchButton, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, 4, DEFAULT_HEIGHT - 4));
+        messageEditTextContainer.addView(voicePitchButton, LayoutHelper.createFrame(24, 24, Gravity.RIGHT | Gravity.BOTTOM, 0, 0, MassgramVoicePitchLayoutHelper.getPitchButtonRightInsetDp(), 10));
         voicePitchButton.bringToFront();
         updateMassgramVoicePitchButtonState();
 
@@ -5849,12 +5850,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (voicePitchButton == null) {
             return;
         }
-        boolean visible = audioVideoButtonContainer != null
-            && audioVideoButtonContainer.getVisibility() == VISIBLE
-            && !recordingAudioVideo
-            && !isInVideoMode()
-            && !isLiveComment
-            && sendVoiceEnabled;
+        boolean visible = shouldShowMassgramVoicePitchButton();
         voicePitchButton.setVisibility(visible ? VISIBLE : GONE);
         if (audioVideoButtonContainer != null) {
             voicePitchButton.setAlpha(visible ? audioVideoButtonContainer.getAlpha() : 0f);
@@ -5869,6 +5865,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             voicePitchButton.setTranslationX(0f);
             voicePitchButton.setTranslationY(0f);
         }
+        updateAttachButtonTranslationX();
     }
 
     private void showMassgramVoicePitchSheet() {
@@ -6266,6 +6263,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.updateBotMenuButton);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.didUpdatePremiumGiftFieldIcon);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.massgramSettingsChanged);
         if (emojiView != null) {
             emojiView.onDestroy();
         }
@@ -6433,6 +6431,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.featuredStickersDidLoad);
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.messageReceivedByServer2);
             NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.sendingMessagesChanged);
+            NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.massgramSettingsChanged);
             currentAccount = account;
             accountInstance = AccountInstance.getInstance(currentAccount);
             NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.recordStarted);
@@ -6448,6 +6447,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.featuredStickersDidLoad);
             NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.messageReceivedByServer2);
             NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.sendingMessagesChanged);
+            NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.massgramSettingsChanged);
         }
 
         sendPlainEnabled = true;
@@ -8486,6 +8486,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                 layoutParams.rightMargin = dp(2);
             }
         }
+        layoutParams.rightMargin += dp(MassgramVoicePitchLayoutHelper.getTextFieldRightExtraInsetDp(shouldShowMassgramVoicePitchButton()));
         layoutParams.rightMargin = Math.max(layoutParams.rightMargin, Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT)));
         if (doneButton != null && doneButton.getVisibility() == VISIBLE) {
             layoutParams.rightMargin = Math.max(layoutParams.rightMargin, Math.max(0, doneButton.width() - dp(DEFAULT_HEIGHT)));
@@ -12582,6 +12583,12 @@ public class ChatActivityEnterView extends FrameLayout implements
                 messageEditText.postInvalidate();
                 messageEditText.invalidateForce();
             }
+        } else if (id == NotificationCenter.massgramSettingsChanged) {
+            updateMassgramVoicePitchButtonState();
+            updateFieldRight(lastAttachVisible);
+            if (messageEditTextContainer != null) {
+                messageEditTextContainer.invalidate();
+            }
         } else if (id == NotificationCenter.recordProgressChanged) {
             int guid = (Integer) args[0];
             if (guid != recordingGuid) {
@@ -13959,7 +13966,18 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (attachButton == null) return;
         attachButton.setTranslationX(attachLayoutPaddingTranslationX + attachLayoutTranslationX + (sendButton != null ? (
             -Math.max(0, sendButton.width() - dp(DEFAULT_HEIGHT + 12)) * sendButton.getAlpha()
-        ) : 0));
+        ) : 0) + dp(MassgramVoicePitchLayoutHelper.getAttachButtonExtraOffsetDp(shouldShowMassgramVoicePitchButton())));
+    }
+
+    private boolean shouldShowMassgramVoicePitchButton() {
+        return voicePitchButton != null
+            && audioVideoButtonContainer != null
+            && audioVideoButtonContainer.getVisibility() == VISIBLE
+            && MassgramConfigManager.getInstance().isVoicePitchButtonVisible()
+            && !recordingAudioVideo
+            && !isInVideoMode()
+            && !isLiveComment
+            && sendVoiceEnabled;
     }
 
     private void updateEmojiButtonParams() {

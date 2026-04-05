@@ -33,6 +33,24 @@ public class MassgramPremiumMessageCodecTest {
     }
 
     @Test
+    public void encodeTodoRestoresNativeTodoPayload() {
+        TLRPC.TL_messageMediaToDo todo = createTodoMedia();
+
+        String encoded = MassgramPremiumMessageCodec.encodeTodo(todo);
+        MassgramPremiumMessageCodec.DecodedPayload payload = MassgramPremiumMessageCodec.decode(encoded);
+
+        assertNotNull(encoded);
+        assertEquals(MassgramPremiumMessageCodec.PLACEHOLDER_TEXT, MassgramPremiumMessageCodec.getVisibleText(encoded));
+        assertNotNull(payload);
+        assertEquals("premium_todo", payload.type);
+        assertNotNull(payload.todo);
+        assertEquals("test", payload.todo.todo.title.text);
+        assertEquals(2, payload.todo.todo.list.size());
+        assertEquals("test", payload.todo.todo.list.get(0).title.text);
+        assertEquals("test1", payload.todo.todo.list.get(1).title.text);
+    }
+
+    @Test
     public void decodeRestoresCustomEmojiEntitiesForPremiumRichText() {
         String original = "\uD83D\uDE80 launch";
         TLRPC.TL_messageEntityCustomEmoji entity = new TLRPC.TL_messageEntityCustomEmoji();
@@ -85,7 +103,7 @@ public class MassgramPremiumMessageCodecTest {
         assertEquals(MassgramPremiumMessageCodec.PLACEHOLDER_TEXT, MassgramPremiumMessageCodec.getVisibleText(malformed));
     }
 
-    private static TLRPC.TL_document createPremiumStickerDocument() {
+    static TLRPC.TL_document createPremiumStickerDocument() {
         TLRPC.TL_document document = new TLRPC.TL_document();
         document.id = 42L;
         document.access_hash = 84L;
@@ -121,7 +139,7 @@ public class MassgramPremiumMessageCodecTest {
         return document;
     }
 
-    private static TLRPC.TL_document createPremiumCustomEmojiDocument(boolean free) {
+    static TLRPC.TL_document createPremiumCustomEmojiDocument(boolean free) {
         TLRPC.TL_document document = new TLRPC.TL_document();
         document.id = 777L;
         document.access_hash = 123L;
@@ -137,5 +155,25 @@ public class MassgramPremiumMessageCodecTest {
         customEmoji.stickerset = new TLRPC.TL_inputStickerSetEmpty();
         document.attributes.add(customEmoji);
         return document;
+    }
+
+    private static TLRPC.TL_messageMediaToDo createTodoMedia() {
+        TLRPC.TL_messageMediaToDo todo = new TLRPC.TL_messageMediaToDo();
+        todo.todo = new TLRPC.TodoList();
+        todo.todo.title = new TLRPC.TL_textWithEntities();
+        todo.todo.title.text = "test";
+
+        TLRPC.TodoItem first = new TLRPC.TodoItem();
+        first.id = 1;
+        first.title = new TLRPC.TL_textWithEntities();
+        first.title.text = "test";
+        todo.todo.list.add(first);
+
+        TLRPC.TodoItem second = new TLRPC.TodoItem();
+        second.id = 2;
+        second.title = new TLRPC.TL_textWithEntities();
+        second.title.text = "test1";
+        todo.todo.list.add(second);
+        return todo;
     }
 }

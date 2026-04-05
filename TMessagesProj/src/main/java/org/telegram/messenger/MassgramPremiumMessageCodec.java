@@ -16,9 +16,11 @@ public final class MassgramPremiumMessageCodec {
     private static final String MARKER = "\u2063\u2061\u2062\u2060";
     private static final String TYPE_PREMIUM_TEXT = "premium_text";
     private static final String TYPE_PREMIUM_STICKER = "premium_sticker";
+    private static final String TYPE_PREMIUM_TODO = "premium_todo";
     private static final String PROTOCOL_PREFIX = "MGP1:";
     private static final String TEXT_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_TEXT + ":";
     private static final String STICKER_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_STICKER + ":";
+    private static final String TODO_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_TODO + ":";
     private static final char[] INVISIBLE_ALPHABET = {'\u2060', '\u2061', '\u2062', '\u2063'};
     private static final Pattern CUSTOM_EMOJI_ENTITY_PATTERN = Pattern.compile("\\{\"type\":\"custom_emoji\",\"offset\":(-?\\d+),\"length\":(\\d+),\"document_id\":(\\d+)\\}");
 
@@ -54,6 +56,28 @@ public final class MassgramPremiumMessageCodec {
             return null;
         }
         return wrapProtocol(STICKER_PROTOCOL_PREFIX + Base64.getEncoder().encodeToString(serializedDocument));
+    }
+
+    public static String encodeTodo(TLRPC.TL_messageMediaToDo todo) {
+        if (todo == null || todo.todo == null) {
+            return null;
+        }
+        byte[] serializedTodo = serializeMessageMedia(todo);
+        if (serializedTodo == null || serializedTodo.length == 0) {
+            return null;
+        }
+        return wrapProtocol(TODO_PROTOCOL_PREFIX + Base64.getEncoder().encodeToString(serializedTodo));
+    }
+
+    public static TLRPC.TL_messageMediaToDo cloneTodo(TLRPC.TL_messageMediaToDo todo) {
+        if (todo == null) {
+            return null;
+        }
+        TLRPC.MessageMedia media = deserializeMessageMedia(serializeMessageMedia(todo));
+        if (media instanceof TLRPC.TL_messageMediaToDo) {
+            return (TLRPC.TL_messageMediaToDo) media;
+        }
+        return null;
     }
 
     public static boolean hasPayload(String text) {
@@ -119,6 +143,20 @@ public final class MassgramPremiumMessageCodec {
                 return null;
             }
             return new DecodedPayload(TYPE_PREMIUM_STICKER, null, document, null);
+        }
+        if (protocol.startsWith(TODO_PROTOCOL_PREFIX)) {
+            String base64Todo = protocol.substring(TODO_PROTOCOL_PREFIX.length());
+            byte[] serializedTodo;
+            try {
+                serializedTodo = Base64.getDecoder().decode(base64Todo);
+            } catch (IllegalArgumentException ignore) {
+                return null;
+            }
+            TLRPC.MessageMedia media = deserializeMessageMedia(serializedTodo);
+            if (!(media instanceof TLRPC.TL_messageMediaToDo)) {
+                return null;
+            }
+            return new DecodedPayload(TYPE_PREMIUM_TODO, null, null, null, (TLRPC.TL_messageMediaToDo) media);
         }
         return null;
     }
@@ -346,6 +384,30 @@ public final class MassgramPremiumMessageCodec {
         }
     }
 
+    private static byte[] serializeMessageMedia(TLRPC.MessageMedia media) {
+        try {
+            SerializedData data = new SerializedData(media.getObjectSize());
+            media.serializeToStream(data);
+            return data.toByteArray();
+        } catch (Exception e) {
+            logCodecError(e);
+            return null;
+        }
+    }
+
+    private static TLRPC.MessageMedia deserializeMessageMedia(byte[] serializedMedia) {
+        if (serializedMedia == null || serializedMedia.length == 0) {
+            return null;
+        }
+        try {
+            SerializedData data = new SerializedData(serializedMedia);
+            return TLRPC.MessageMedia.TLdeserialize(data, data.readInt32(true), true);
+        } catch (Exception e) {
+            logCodecError(e);
+            return null;
+        }
+    }
+
     private static void logCodecError(Exception e) {
         try {
             FileLog.e(e);
@@ -359,12 +421,18 @@ public final class MassgramPremiumMessageCodec {
         public final String text;
         public final TLRPC.Document document;
         public final ArrayList<TLRPC.MessageEntity> entities;
+        public final TLRPC.TL_messageMediaToDo todo;
 
         public DecodedPayload(String type, String text, TLRPC.Document document, ArrayList<TLRPC.MessageEntity> entities) {
+            this(type, text, document, entities, null);
+        }
+
+        public DecodedPayload(String type, String text, TLRPC.Document document, ArrayList<TLRPC.MessageEntity> entities, TLRPC.TL_messageMediaToDo todo) {
             this.type = type;
             this.text = text;
             this.document = document;
             this.entities = entities;
+            this.todo = todo;
         }
     }
 }

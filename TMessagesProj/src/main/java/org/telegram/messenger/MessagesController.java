@@ -912,7 +912,7 @@ public class MessagesController extends BaseController implements NotificationCe
 
 
     public ArrayList<TLRPC.TL_messages_stickerSet> filterPremiumStickers(ArrayList<TLRPC.TL_messages_stickerSet> stickerSets) {
-        if (!premiumFeaturesBlocked() || MassgramConfigManager.getInstance().isPremiumUnlockEnabled()) {
+        if (!premiumFeaturesBlocked() || MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
             return stickerSets;
         }
         for (int i = 0; i < stickerSets.size(); i++) {
@@ -928,7 +928,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public TLRPC.TL_messages_stickerSet filterPremiumStickers(TLRPC.TL_messages_stickerSet stickerSet) {
-        if (!premiumFeaturesBlocked() || MassgramConfigManager.getInstance().isPremiumUnlockEnabled() || stickerSet == null) {
+        if (!premiumFeaturesBlocked() || MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount) || stickerSet == null) {
             return stickerSet;
         }
         try {
@@ -20557,7 +20557,6 @@ public class MessagesController extends BaseController implements NotificationCe
             info.loadTime = SystemClock.elapsedRealtime();
             info.posts_between = null;
             info.messages = new ArrayList<>();
-            getNotificationCenter().postNotificationName(NotificationCenter.didLoadSponsoredMessages, dialogId, info.messages);
             return info;
         }
         SponsoredMessagesInfo info = sponsoredMessages.get(dialogId);

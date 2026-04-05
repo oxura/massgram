@@ -10,6 +10,7 @@ public class MassgramConfigManager {
 
     private static final String KEY_VOICE_PITCH_ENABLED = "massgram_voice_pitch_enabled";
     private static final String KEY_VOICE_PITCH_SEMITONES = "massgram_voice_pitch_semitones";
+    private static final String KEY_VOICE_PITCH_BUTTON_VISIBLE = "massgram_voice_pitch_button_visible";
     private static final String KEY_BLOCK_SPONSORED_MESSAGES = "massgram_block_sponsored_messages";
     private static final String KEY_DISABLE_LOCAL_STATS = "massgram_disable_local_stats";
     private static final String KEY_EXPANDED_UI_LIMITS = "massgram_expanded_ui_limits";
@@ -68,6 +69,19 @@ public class MassgramConfigManager {
         return (float) Math.pow(2.0d, getVoicePitchSemitones() / 12.0d);
     }
 
+    public boolean isVoicePitchButtonVisible() {
+        return getPreferences().getBoolean(KEY_VOICE_PITCH_BUTTON_VISIBLE, true);
+    }
+
+    public void setVoicePitchButtonVisible(boolean visible) {
+        SharedPreferences preferences = getPreferences();
+        if (preferences.getBoolean(KEY_VOICE_PITCH_BUTTON_VISIBLE, true) == visible) {
+            return;
+        }
+        preferences.edit().putBoolean(KEY_VOICE_PITCH_BUTTON_VISIBLE, visible).apply();
+        notifyChanged();
+    }
+
     public boolean isSponsoredMessagesBlocked() {
         return getPreferences().getBoolean(KEY_BLOCK_SPONSORED_MESSAGES, true);
     }
@@ -102,14 +116,22 @@ public class MassgramConfigManager {
         return getPreferences().getBoolean(KEY_PREMIUM_UNLOCK, false);
     }
 
+    public boolean isMassgramFeaturesEnabled() {
+        return isPremiumUnlockEnabled();
+    }
+
     public boolean canUsePremiumFeatures(int currentAccount) {
         return MassgramPremiumTransportPolicy.canUsePremiumFeatures(
             UserConfig.getInstance(currentAccount).isPremium(),
-            isPremiumUnlockEnabled()
+            isMassgramFeaturesEnabled()
         );
     }
 
     public void setPremiumUnlockEnabled(boolean enabled) {
+        setMassgramFeaturesEnabled(enabled);
+    }
+
+    public void setMassgramFeaturesEnabled(boolean enabled) {
         SharedPreferences preferences = getPreferences();
         if (preferences.getBoolean(KEY_PREMIUM_UNLOCK, false) == enabled) {
             return;

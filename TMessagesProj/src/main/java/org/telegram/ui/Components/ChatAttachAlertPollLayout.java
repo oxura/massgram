@@ -35,6 +35,7 @@ import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
@@ -223,7 +224,7 @@ public class ChatAttachAlertPollLayout extends ChatAttachAlert.AttachAlertLayout
         answersChecks = new boolean[maxAnswersCount];
 
         updateRows();
-        isPremium = AccountInstance.getInstance(parentAlert.currentAccount).getUserConfig().isPremium();
+        isPremium = MassgramConfigManager.getInstance().canUsePremiumFeatures(parentAlert.currentAccount);
         /*if (quiz != null) {
             quizPoll = quiz;
             quizOnly = quizPoll ? 1 : 2;

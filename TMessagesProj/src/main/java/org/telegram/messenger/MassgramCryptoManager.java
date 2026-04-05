@@ -1,7 +1,6 @@
 package org.telegram.messenger;
 
 import android.content.SharedPreferences;
-import android.text.TextUtils;
 import android.util.Base64;
 import android.util.SparseArray;
 
@@ -58,7 +57,7 @@ public class MassgramCryptoManager {
         SharedPreferences.Editor editor = getPreferences().edit();
         if (enabled) {
             editor.putBoolean(getEnabledKey(dialogId), true);
-            if (TextUtils.isEmpty(getPreferences().getString(getDialogKeyKey(dialogId), null))) {
+            if (isEmpty(getPreferences().getString(getDialogKeyKey(dialogId), null))) {
                 editor.putString(getDialogKeyKey(dialogId), DEFAULT_DIALOG_KEY);
             }
         } else {
@@ -80,26 +79,26 @@ public class MassgramCryptoManager {
 
     public boolean looksLikeEncryptedPayload(String text) {
         String sanitized = stripCapabilityMarker(text);
-        return !TextUtils.isEmpty(sanitized) && sanitized.startsWith(PAYLOAD_PREFIX);
+        return !isEmpty(sanitized) && sanitized.startsWith(PAYLOAD_PREFIX);
     }
 
     public boolean containsCapabilityMarker(String text) {
-        return !TextUtils.isEmpty(text) && text.contains(CAPABILITY_MARKER);
+        return !isEmpty(text) && text.contains(CAPABILITY_MARKER);
     }
 
     public String appendCapabilityMarker(long dialogId, String text) {
-        if (!supportsDialog(dialogId) || TextUtils.isEmpty(text) || looksLikeEncryptedPayload(text)) {
+        if (!supportsDialog(dialogId) || isEmpty(text) || looksLikeEncryptedPayload(text) || MassgramPremiumMessageCodec.hasPayload(text)) {
             return text;
         }
         String stripped = stripCapabilityMarker(text);
-        if (TextUtils.isEmpty(stripped)) {
+        if (isEmpty(stripped)) {
             return stripped;
         }
         return stripped + CAPABILITY_MARKER;
     }
 
     public String stripCapabilityMarker(String text) {
-        if (TextUtils.isEmpty(text) || !text.contains(CAPABILITY_MARKER)) {
+        if (isEmpty(text) || !text.contains(CAPABILITY_MARKER)) {
             return text;
         }
         return text.replace(CAPABILITY_MARKER, "");
@@ -107,7 +106,7 @@ public class MassgramCryptoManager {
 
     public String encryptOutgoingText(long dialogId, String text) {
         String visibleText = stripCapabilityMarker(text);
-        if (!supportsDialog(dialogId) || TextUtils.isEmpty(visibleText) || looksLikeEncryptedPayload(visibleText)) {
+        if (!supportsDialog(dialogId) || isEmpty(visibleText) || looksLikeEncryptedPayload(visibleText)) {
             return text;
         }
         try {
@@ -133,10 +132,13 @@ public class MassgramCryptoManager {
         String resolvedText = resolveTransportText(dialogId, text, incoming, supportsDialog);
         MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramPremiumMessageCodec.decode(resolvedText);
         if (premiumPayload != null) {
-            return premiumPayload.text != null ? premiumPayload.text : MassgramPremiumMessageCodec.getVisibleText(resolvedText);
+            if (premiumPayload.text != null) {
+                return premiumPayload.text;
+            }
+            return "";
         }
         String visibleText = MassgramPremiumMessageCodec.getVisibleText(resolvedText);
-        if (visibleText != null && !TextUtils.equals(visibleText, resolvedText)) {
+        if (visibleText != null && !visibleText.equals(resolvedText)) {
             return visibleText;
         }
         return resolvedText;
@@ -152,7 +154,7 @@ public class MassgramCryptoManager {
         if (incoming && supportsDialog && hasCapabilityMarker) {
             markPeerDetected(dialogId);
         }
-        if (!supportsDialog || TextUtils.isEmpty(sanitized) || !looksLikeEncryptedPayload(sanitized)) {
+        if (!supportsDialog || isEmpty(sanitized) || !looksLikeEncryptedPayload(sanitized)) {
             return sanitized;
         }
         try {
@@ -213,6 +215,10 @@ public class MassgramCryptoManager {
 
     private SharedPreferences getPreferences() {
         return MessagesController.getMainSettings(currentAccount);
+    }
+
+    private static boolean isEmpty(String value) {
+        return value == null || value.length() == 0;
     }
 
     private String getEnabledKey(long dialogId) {

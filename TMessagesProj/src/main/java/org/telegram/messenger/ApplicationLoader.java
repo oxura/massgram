@@ -194,6 +194,7 @@ public class ApplicationLoader extends Application {
         }
         applicationInited = true;
         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+        MassgramTelemetryManager.getInstance().initialize();
 
         try {
             LocaleController.getInstance(); //TODO improve

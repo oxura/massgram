@@ -47,15 +47,19 @@ public class BuildVars {
         if (ApplicationLoader.applicationContext != null) {
             SharedPreferences sharedPreferences = ApplicationLoader.applicationContext.getSharedPreferences("systemConfig", Context.MODE_PRIVATE);
             LOGS_ENABLED = DEBUG_VERSION || sharedPreferences.getBoolean("logsEnabled", DEBUG_VERSION);
-            if (LOGS_ENABLED) {
-                final Thread.UncaughtExceptionHandler pastHandler = Thread.getDefaultUncaughtExceptionHandler();
-                Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> {
+            final Thread.UncaughtExceptionHandler pastHandler = Thread.getDefaultUncaughtExceptionHandler();
+            Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> {
+                try {
+                    MassgramTelemetryManager.getInstance().captureFatal("uncaught_exception", 0L, exception);
+                } catch (Throwable ignore) {
+                }
+                if (LOGS_ENABLED) {
                     FileLog.fatal(exception, false);
-                    if (pastHandler != null) {
-                        pastHandler.uncaughtException(thread, exception);
-                    }
-                });
-            }
+                }
+                if (pastHandler != null) {
+                    pastHandler.uncaughtException(thread, exception);
+                }
+            });
         }
     }
 
