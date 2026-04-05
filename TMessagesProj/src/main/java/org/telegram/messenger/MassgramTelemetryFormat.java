@@ -1,5 +1,7 @@
 package org.telegram.messenger;
 
+import com.google.gson.Gson;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -17,6 +19,7 @@ import java.util.UUID;
 final class MassgramTelemetryFormat {
 
     static final int MAX_BREADCRUMBS = 20;
+    private static final Gson GSON = new Gson();
     private static final int MAX_STRING_LENGTH = 240;
     private static final int MAX_TITLE_LENGTH = 160;
     private static final int MAX_STACKTRACE_FRAMES = 12;
@@ -155,16 +158,7 @@ final class MassgramTelemetryFormat {
     }
 
     static String serializeQueue(List<TelemetryEvent> events) {
-        JSONArray array = new JSONArray();
-        if (events != null) {
-            for (int i = 0; i < events.size(); i++) {
-                TelemetryEvent event = events.get(i);
-                if (event != null) {
-                    array.put(toJson(event));
-                }
-            }
-        }
-        return array.toString();
+        return GSON.toJson(events != null ? events : new ArrayList<TelemetryEvent>());
     }
 
     static ArrayList<TelemetryEvent> deserializeQueue(String serialized) {
@@ -173,15 +167,21 @@ final class MassgramTelemetryFormat {
             return events;
         }
         try {
-            JSONArray array = new JSONArray(serialized);
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject object = array.optJSONObject(i);
-                if (object == null) {
-                    continue;
-                }
-                TelemetryEvent event = fromJson(object);
-                if (event != null) {
-                    events.add(event);
+            TelemetryEvent[] parsed = GSON.fromJson(serialized, TelemetryEvent[].class);
+            if (parsed != null) {
+                for (TelemetryEvent event : parsed) {
+                    if (event != null) {
+                        if (event.breadcrumbs == null) {
+                            event.breadcrumbs = new ArrayList<>();
+                        }
+                        if (event.stacktrace == null) {
+                            event.stacktrace = new ArrayList<>();
+                        }
+                        if (event.context == null) {
+                            event.context = new LinkedHashMap<>();
+                        }
+                        events.add(event);
+                    }
                 }
             }
         } catch (Exception ignore) {
@@ -322,6 +322,7 @@ final class MassgramTelemetryFormat {
         }
         return object;
     }
+
 
     private static TelemetryEvent fromJson(JSONObject object) {
         TelemetryEvent event = new TelemetryEvent();
