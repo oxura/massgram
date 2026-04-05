@@ -1954,6 +1954,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             poller.checkList( this);
         }
 
+        @Override
+        public boolean dispatchTouchEvent(MotionEvent ev) {
+            if (ev.getAction() == MotionEvent.ACTION_DOWN && ev.getY() < (getPaddingTop() + scrollYOffset)) {
+                return false;
+            }
+
+            return super.dispatchTouchEvent(ev);
+        }
+
         private boolean drawMovingViewsOverlayed() {
             return getItemAnimator() != null && getItemAnimator().isRunning();
         }
