@@ -51,6 +51,7 @@ in [gradle.properties](D:/Projects/flower-web/gradle.properties) before building
 ## Notes
 
 - The app only offers an update when `versionCode` in `latest.json` is greater than the installed app version.
+- The publish script now reads the real `versionCode` and `versionName` from the built APK and writes those values into the update manifest. This avoids mismatches caused by ABI-specific package version codes.
 - The APK is verified against `sha256` before install.
 - Users still need to confirm the Android install prompt.
 - GitHub `latest` points to the most recent published non-draft, non-prerelease release.
