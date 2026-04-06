@@ -167,6 +167,8 @@ import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MassgramConfigManager;
 import org.telegram.messenger.MassgramPremiumMessageCodec;
+import org.telegram.messenger.MassgramReactionSyncHelper;
+import org.telegram.messenger.MassgramReactionSyncManager;
 import org.telegram.messenger.MassgramTelemetryManager;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
@@ -20755,7 +20757,7 @@ public class ChatActivity extends BaseFragment implements
                 if (messagesDict[loadIndex].indexOfKey(messageId) >= 0) {
                     continue;
                 }
-                if (obj.messageOwner instanceof TLRPC.TL_messageEmpty) {
+                if (obj.messageOwner instanceof TLRPC.TL_messageEmpty || consumeMassgramReactionTransport(obj, loadIndex)) {
                     continue;
                 }
                 if (getTopicId() != 0 && obj.messageOwner.action instanceof TLRPC.TL_messageActionTopicCreate) {
@@ -25167,7 +25169,7 @@ public class ChatActivity extends BaseFragment implements
                 if (action instanceof TLRPC.TL_messageActionChannelMigrateFrom) {
                     continue;
                 }
-                if (obj.messageOwner instanceof TLRPC.TL_messageEmpty) {
+                if (obj.messageOwner instanceof TLRPC.TL_messageEmpty || consumeMassgramReactionTransport(obj, 0)) {
                     continue;
                 }
                 if (!isTopic && threadMessageObject != null && obj.isReply() && !(obj.messageOwner.action instanceof TLRPC.TL_messageActionPinMessage)) {
@@ -25299,7 +25301,7 @@ public class ChatActivity extends BaseFragment implements
                 if (action instanceof TLRPC.TL_messageActionChannelMigrateFrom) {
                     continue;
                 }
-                if (obj.messageOwner instanceof TLRPC.TL_messageEmpty) {
+                if (obj.messageOwner instanceof TLRPC.TL_messageEmpty || consumeMassgramReactionTransport(obj, 0)) {
                     continue;
                 }
                 if (threadMessageObject != null && threadMessageObject.messageOwner.replies != null && obj.isReply() && !(obj.messageOwner.action instanceof TLRPC.TL_messageActionPinMessage)) {
@@ -32146,6 +32148,28 @@ public class ChatActivity extends BaseFragment implements
 
     Runnable updateReactionRunnable;
 
+    private boolean consumeMassgramReactionTransport(MessageObject obj, int loadIndex) {
+        if (obj == null || !obj.isMassgramReactionTransportMessage()) {
+            return false;
+        }
+        MassgramPremiumMessageCodec.ReactionStatePayload payload = obj.getMassgramReactionStatePayload();
+        if (payload == null) {
+            return true;
+        }
+        MessageObject targetMessage = null;
+        if (messagesDict[loadIndex] != null) {
+            targetMessage = messagesDict[loadIndex].get(payload.targetMessageId);
+        }
+        if (targetMessage == null && messagesDict[0] != null) {
+            targetMessage = messagesDict[0].get(payload.targetMessageId);
+        }
+        if (targetMessage != null && MassgramReactionSyncManager.getInstance(currentAccount).applyStoredState(dialog_id, targetMessage.messageOwner, getUserConfig().getClientUserId())) {
+            updateMessageAnimated(targetMessage, true);
+        }
+        obj.setIsRead();
+        return true;
+    }
+
     private void showMultipleReactionsPromo(View cell, ReactionsLayoutInBubble.VisibleReaction visibleReaction, int currentChosenReactions) {
         if (SharedConfig.multipleReactionsPromoShowed || cell == null || visibleReaction == null || MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
             return;
@@ -32240,6 +32264,7 @@ public class ChatActivity extends BaseFragment implements
         }
 
         ReactionsEffectOverlay.removeCurrent(false);
+        final TLRPC.TL_messageReactions previousReactions = MassgramReactionSyncHelper.cloneReactions(primaryMessage.messageOwner.reactions);
         final int currentChosenReactions = primaryMessage.getChoosenReactions().size();
         final boolean added = primaryMessage.selectReaction(visibleReaction, bigEmoji, fromDoubleTap);
         int messageIdForCell = primaryMessage.getId();
@@ -32265,7 +32290,7 @@ public class ChatActivity extends BaseFragment implements
         }
         ArrayList<ReactionsLayoutInBubble.VisibleReaction> visibleReactions = new ArrayList<>();
         visibleReactions.addAll(primaryMessage.getChoosenReactions());
-        getSendMessagesHelper().sendReaction(primaryMessage, visibleReactions, added ? visibleReaction : null, bigEmoji, addToRecent, ChatActivity.this, updateReactionRunnable = new Runnable() {
+        getSendMessagesHelper().sendReaction(primaryMessage, visibleReactions, added ? visibleReaction : null, bigEmoji, addToRecent, ChatActivity.this, previousReactions, updateReactionRunnable = new Runnable() {
             @Override
             public void run() {
                 if (withoutAnimation) {
@@ -32299,6 +32324,14 @@ public class ChatActivity extends BaseFragment implements
                     closeMenu();
                 }
             }
+        }, () -> {
+            primaryMessage.messageOwner.reactions = MassgramReactionSyncHelper.cloneReactions(previousReactions);
+            MessageObject messageInDict = messagesDict[0].get(primaryMessage.getId());
+            if (messageInDict != null && messageInDict != primaryMessage) {
+                messageInDict.messageOwner.reactions = MassgramReactionSyncHelper.cloneReactions(previousReactions);
+            }
+            updateMessageAnimated(primaryMessage, true);
+            closeMenu();
         });
 
         if (fromDoubleTap || withoutAnimation) {

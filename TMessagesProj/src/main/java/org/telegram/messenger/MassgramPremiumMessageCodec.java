@@ -17,10 +17,12 @@ public final class MassgramPremiumMessageCodec {
     private static final String TYPE_PREMIUM_TEXT = "premium_text";
     private static final String TYPE_PREMIUM_STICKER = "premium_sticker";
     private static final String TYPE_PREMIUM_TODO = "premium_todo";
+    private static final String TYPE_PREMIUM_REACTION_STATE = "premium_reaction_state";
     private static final String PROTOCOL_PREFIX = "MGP1:";
     private static final String TEXT_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_TEXT + ":";
     private static final String STICKER_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_STICKER + ":";
     private static final String TODO_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_TODO + ":";
+    private static final String REACTION_STATE_PROTOCOL_PREFIX = PROTOCOL_PREFIX + TYPE_PREMIUM_REACTION_STATE + ":";
     private static final char[] INVISIBLE_ALPHABET = {'\u2060', '\u2061', '\u2062', '\u2063'};
     private static final Pattern CUSTOM_EMOJI_ENTITY_PATTERN = Pattern.compile("\\{\"type\":\"custom_emoji\",\"offset\":(-?\\d+),\"length\":(\\d+),\"document_id\":(\\d+)\\}");
 
@@ -78,6 +80,17 @@ public final class MassgramPremiumMessageCodec {
             return (TLRPC.TL_messageMediaToDo) media;
         }
         return null;
+    }
+
+    public static String encodeReactionState(int targetMessageId, long actorPeerId, ArrayList<TLRPC.Reaction> reactions) {
+        if (targetMessageId == 0 || actorPeerId == 0) {
+            return null;
+        }
+        byte[] serializedReactionState = serializeReactionState(targetMessageId, actorPeerId, reactions);
+        if (serializedReactionState == null || serializedReactionState.length == 0) {
+            return null;
+        }
+        return wrapProtocol(REACTION_STATE_PROTOCOL_PREFIX + Base64.getEncoder().encodeToString(serializedReactionState));
     }
 
     public static boolean hasPayload(String text) {
@@ -157,6 +170,20 @@ public final class MassgramPremiumMessageCodec {
                 return null;
             }
             return new DecodedPayload(TYPE_PREMIUM_TODO, null, null, null, (TLRPC.TL_messageMediaToDo) media);
+        }
+        if (protocol.startsWith(REACTION_STATE_PROTOCOL_PREFIX)) {
+            String base64ReactionState = protocol.substring(REACTION_STATE_PROTOCOL_PREFIX.length());
+            byte[] serializedReactionState;
+            try {
+                serializedReactionState = Base64.getDecoder().decode(base64ReactionState);
+            } catch (IllegalArgumentException ignore) {
+                return null;
+            }
+            ReactionStatePayload reactionState = deserializeReactionState(serializedReactionState);
+            if (reactionState == null) {
+                return null;
+            }
+            return new DecodedPayload(TYPE_PREMIUM_REACTION_STATE, null, null, null, null, reactionState);
         }
         return null;
     }
@@ -408,6 +435,55 @@ public final class MassgramPremiumMessageCodec {
         }
     }
 
+    private static byte[] serializeReactionState(int targetMessageId, long actorPeerId, ArrayList<TLRPC.Reaction> reactions) {
+        try {
+            SerializedData data = new SerializedData();
+            data.writeInt32(targetMessageId);
+            data.writeInt64(actorPeerId);
+            int count = reactions == null ? 0 : reactions.size();
+            data.writeInt32(count);
+            for (int i = 0; i < count; i++) {
+                reactions.get(i).serializeToStream(data);
+            }
+            return data.toByteArray();
+        } catch (Exception e) {
+            logCodecError(e);
+            return null;
+        }
+    }
+
+    private static ReactionStatePayload deserializeReactionState(byte[] serializedReactionState) {
+        if (serializedReactionState == null || serializedReactionState.length == 0) {
+            return null;
+        }
+        SerializedData data = null;
+        try {
+            data = new SerializedData(serializedReactionState);
+            int targetMessageId = data.readInt32(true);
+            long actorPeerId = data.readInt64(true);
+            int count = data.readInt32(true);
+            if (targetMessageId == 0 || actorPeerId == 0 || count < 0 || count > 32) {
+                return null;
+            }
+            ArrayList<TLRPC.Reaction> reactions = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                TLRPC.Reaction reaction = TLRPC.Reaction.TLdeserialize(data, data.readInt32(true), true);
+                if (reaction == null) {
+                    return null;
+                }
+                reactions.add(reaction);
+            }
+            return new ReactionStatePayload(targetMessageId, actorPeerId, reactions);
+        } catch (Exception e) {
+            logCodecError(e);
+            return null;
+        } finally {
+            if (data != null) {
+                data.cleanup();
+            }
+        }
+    }
+
     private static void logCodecError(Exception e) {
         try {
             FileLog.e(e);
@@ -422,17 +498,35 @@ public final class MassgramPremiumMessageCodec {
         public final TLRPC.Document document;
         public final ArrayList<TLRPC.MessageEntity> entities;
         public final TLRPC.TL_messageMediaToDo todo;
+        public final ReactionStatePayload reactionState;
 
         public DecodedPayload(String type, String text, TLRPC.Document document, ArrayList<TLRPC.MessageEntity> entities) {
-            this(type, text, document, entities, null);
+            this(type, text, document, entities, null, null);
         }
 
         public DecodedPayload(String type, String text, TLRPC.Document document, ArrayList<TLRPC.MessageEntity> entities, TLRPC.TL_messageMediaToDo todo) {
+            this(type, text, document, entities, todo, null);
+        }
+
+        public DecodedPayload(String type, String text, TLRPC.Document document, ArrayList<TLRPC.MessageEntity> entities, TLRPC.TL_messageMediaToDo todo, ReactionStatePayload reactionState) {
             this.type = type;
             this.text = text;
             this.document = document;
             this.entities = entities;
             this.todo = todo;
+            this.reactionState = reactionState;
+        }
+    }
+
+    public static final class ReactionStatePayload {
+        public final int targetMessageId;
+        public final long actorPeerId;
+        public final ArrayList<TLRPC.Reaction> reactions;
+
+        public ReactionStatePayload(int targetMessageId, long actorPeerId, ArrayList<TLRPC.Reaction> reactions) {
+            this.targetMessageId = targetMessageId;
+            this.actorPeerId = actorPeerId;
+            this.reactions = reactions != null ? reactions : new ArrayList<>();
         }
     }
 }

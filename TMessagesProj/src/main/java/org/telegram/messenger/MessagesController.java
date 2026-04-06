@@ -21054,6 +21054,27 @@ public class MessagesController extends BaseController implements NotificationCe
         return false;
     }
 
+    private void applyMassgramReactionTransport(long dialogId, MessageObject messageObject) {
+        if (messageObject == null || !messageObject.isMassgramReactionTransportMessage()) {
+            return;
+        }
+        MassgramPremiumMessageCodec.ReactionStatePayload payload = messageObject.getMassgramReactionStatePayload();
+        if (payload == null) {
+            return;
+        }
+        ArrayList<MessageObject> cachedMessages = dialogMessage.get(dialogId);
+        if (cachedMessages == null) {
+            return;
+        }
+        for (int i = 0; i < cachedMessages.size(); i++) {
+            MessageObject cachedMessage = cachedMessages.get(i);
+            if (cachedMessage.getId() == payload.targetMessageId && MassgramReactionSyncManager.getInstance(currentAccount).applyStoredState(dialogId, cachedMessage.messageOwner, getUserConfig().getClientUserId())) {
+                getNotificationCenter().postNotificationName(NotificationCenter.didUpdateReactions, dialogId, cachedMessage.getId(), cachedMessage.messageOwner.reactions);
+                return;
+            }
+        }
+    }
+
     public boolean updateInterfaceWithMessages(long dialogId, ArrayList<MessageObject> messages, int mode) {
         if (messages == null || messages.isEmpty()) {
             return false;
@@ -21069,6 +21090,10 @@ public class MessagesController extends BaseController implements NotificationCe
         if (!scheduled && !quickReplies) {
             for (int a = 0; a < messages.size(); a++) {
                 MessageObject message = messages.get(a);
+                if (message.isMassgramReactionTransportMessage()) {
+                    applyMassgramReactionTransport(dialogId, message);
+                    continue;
+                }
                 if (lastMessage == null || (!isEncryptedChat && message.getId() > lastMessage.getId() || (isEncryptedChat || message.getId() < 0 && lastMessage.getId() < 0) && message.getId() < lastMessage.getId()) || message.messageOwner.date > lastMessage.messageOwner.date) {
                     lastMessage = message;
                     if (message.messageOwner.peer_id.channel_id != 0) {

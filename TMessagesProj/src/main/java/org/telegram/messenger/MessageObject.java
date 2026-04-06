@@ -182,6 +182,8 @@ public class MessageObject {
     public TLRPC.VideoSize emojiMarkup;
     private boolean emojiAnimatedStickerLoading;
     private boolean massgramPremiumMediaInjected;
+    private boolean massgramReactionTransportMessage;
+    private MassgramPremiumMessageCodec.ReactionStatePayload massgramReactionStatePayload;
     public String emojiAnimatedStickerColor;
     public CharSequence messageText;
     public CharSequence messageTextShort;
@@ -796,6 +798,14 @@ public class MessageObject {
 
     public boolean isUnsupported() {
         return getMedia(messageOwner) instanceof TLRPC.TL_messageMediaUnsupported;
+    }
+
+    public boolean isMassgramReactionTransportMessage() {
+        return massgramReactionTransportMessage;
+    }
+
+    public MassgramPremiumMessageCodec.ReactionStatePayload getMassgramReactionStatePayload() {
+        return massgramReactionStatePayload;
     }
 
     public boolean isExpiredStory() {
@@ -1890,6 +1900,9 @@ public class MessageObject {
 
         applyMassgramPremiumPayload();
         updateMessageText(users, chats, sUsers, sChats);
+        if (!massgramReactionTransportMessage) {
+            MassgramReactionSyncManager.getInstance(currentAccount).applyStoredState(getDialogId(), messageOwner, UserConfig.getInstance(currentAccount).getClientUserId());
+        }
         setType();
         if (generateLayout) {
             updateTranslation(false);
@@ -3685,12 +3698,18 @@ public class MessageObject {
         if (massgramPremiumMediaInjected) {
             return "";
         }
+        if (massgramReactionTransportMessage) {
+            return "";
+        }
         MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramCryptoManager.getInstance(currentAccount)
             .decodePremiumPayload(getDialogId(), messageOwner.message, !isOutOwner());
         if (premiumPayload != null) {
             messageOwner.entities = premiumPayload.entities != null ? premiumPayload.entities : new ArrayList<>();
             if (premiumPayload.text != null) {
                 return premiumPayload.text;
+            }
+            if (premiumPayload.reactionState != null) {
+                return "";
             }
             if (premiumPayload.todo != null || premiumPayload.document != null) {
                 return "";
@@ -3702,6 +3721,8 @@ public class MessageObject {
 
     private void applyMassgramPremiumPayload() {
         massgramPremiumMediaInjected = false;
+        massgramReactionTransportMessage = false;
+        massgramReactionStatePayload = null;
         if (messageOwner == null || TextUtils.isEmpty(messageOwner.message)) {
             return;
         }
@@ -3713,6 +3734,12 @@ public class MessageObject {
         MassgramPremiumMessageCodec.DecodedPayload premiumPayload = MassgramCryptoManager.getInstance(currentAccount)
             .decodePremiumPayload(getDialogId(), messageOwner.message, !messageOwner.out);
         if (premiumPayload == null) {
+            return;
+        }
+        if (premiumPayload.reactionState != null) {
+            massgramReactionTransportMessage = true;
+            massgramReactionStatePayload = premiumPayload.reactionState;
+            MassgramReactionSyncManager.getInstance(currentAccount).storeReactionState(getDialogId(), premiumPayload.reactionState, messageOwner.message);
             return;
         }
         if (premiumPayload.todo != null) {

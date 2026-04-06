@@ -86,6 +86,27 @@ public class MassgramPremiumMessageCodecTest {
     }
 
     @Test
+    public void encodeReactionStateRestoresTargetActorAndReactions() {
+        java.util.ArrayList<TLRPC.Reaction> reactions = new java.util.ArrayList<>();
+        TLRPC.TL_reactionCustomEmoji customEmoji = new TLRPC.TL_reactionCustomEmoji();
+        customEmoji.document_id = 777L;
+        reactions.add(customEmoji);
+
+        String encoded = MassgramPremiumMessageCodec.encodeReactionState(55, 42L, reactions);
+        MassgramPremiumMessageCodec.DecodedPayload payload = MassgramPremiumMessageCodec.decode(encoded);
+
+        assertNotNull(encoded);
+        assertNotNull(payload);
+        assertEquals("premium_reaction_state", payload.type);
+        assertNotNull(payload.reactionState);
+        assertEquals(55, payload.reactionState.targetMessageId);
+        assertEquals(42L, payload.reactionState.actorPeerId);
+        assertEquals(1, payload.reactionState.reactions.size());
+        assertTrue(payload.reactionState.reactions.get(0) instanceof TLRPC.TL_reactionCustomEmoji);
+        assertEquals(777L, ((TLRPC.TL_reactionCustomEmoji) payload.reactionState.reactions.get(0)).document_id);
+    }
+
+    @Test
     public void plainTextHasNoPayload() {
         assertFalse(MassgramPremiumMessageCodec.hasPayload("Unsupported Massgram message"));
         assertEquals("Plain", MassgramPremiumMessageCodec.getVisibleText("Plain"));

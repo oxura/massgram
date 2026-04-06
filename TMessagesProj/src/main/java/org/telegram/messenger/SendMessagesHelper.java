@@ -3818,6 +3818,20 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         BaseFragment parentFragment,
         Runnable callback
     ) {
+        sendReaction(messageObject, visibleReactions, addedReaction, big, addToRecent, parentFragment, null, callback, null);
+    }
+
+    public void sendReaction(
+        MessageObject messageObject,
+        ArrayList<ReactionsLayoutInBubble.VisibleReaction> visibleReactions,
+        ReactionsLayoutInBubble.VisibleReaction addedReaction,
+        boolean big,
+        boolean addToRecent,
+        BaseFragment parentFragment,
+        TLRPC.TL_messageReactions previousReactions,
+        Runnable callback,
+        Runnable errorCallback
+    ) {
         if (messageObject == null || parentFragment == null) {
             return;
         }
@@ -3859,8 +3873,84 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 if (callback != null) {
                     AndroidUtilities.runOnUIThread(callback);
                 }
+            } else if (shouldUseMassgramReactionFallback(messageObject, visibleReactions, previousReactions)) {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (sendMassgramReactionStateAsPayload(messageObject, visibleReactions)) {
+                        if (callback != null) {
+                            callback.run();
+                        }
+                    } else if (errorCallback != null) {
+                        errorCallback.run();
+                    }
+                });
+            } else if (errorCallback != null) {
+                AndroidUtilities.runOnUIThread(errorCallback);
             }
         });
+    }
+
+    private boolean shouldUseMassgramReactionFallback(MessageObject messageObject, ArrayList<ReactionsLayoutInBubble.VisibleReaction> visibleReactions, TLRPC.TL_messageReactions previousReactions) {
+        if (messageObject == null || UserConfig.getInstance(currentAccount).isPremium() || !MassgramConfigManager.getInstance().canUsePremiumFeatures(currentAccount)) {
+            return false;
+        }
+        if (containsCustomReaction(visibleReactions)) {
+            return true;
+        }
+        return containsChosenCustomReaction(previousReactions);
+    }
+
+    private boolean sendMassgramReactionStateAsPayload(MessageObject messageObject, ArrayList<ReactionsLayoutInBubble.VisibleReaction> visibleReactions) {
+        ArrayList<TLRPC.Reaction> reactions = new ArrayList<>();
+        if (visibleReactions != null) {
+            for (int i = 0; i < visibleReactions.size(); i++) {
+                reactions.add(ReactionsUtils.toTLReaction(visibleReactions.get(i)));
+            }
+        }
+        String payloadMessage = MassgramPremiumMessageCodec.encodeReactionState(messageObject.getId(), getReactionActorPeerId(messageObject), reactions);
+        if (TextUtils.isEmpty(payloadMessage)) {
+            return false;
+        }
+        SendMessageParams sendMessageParams = SendMessageParams.of(payloadMessage, messageObject.getDialogId(), null, null, null, false, null, null, null, false, 0, 0, null, false);
+        sendMessage(sendMessageParams);
+        return true;
+    }
+
+    private long getReactionActorPeerId(MessageObject messageObject) {
+        TLRPC.Peer sendAsPeer;
+        if (messageObject.messageOwner != null && messageObject.messageOwner.isThreadMessage && messageObject.messageOwner.fwd_from != null) {
+            sendAsPeer = getMessagesController().getSendAsSelectedPeer(messageObject.getFromChatId());
+        } else {
+            sendAsPeer = getMessagesController().getSendAsSelectedPeer(messageObject.getDialogId());
+        }
+        if (sendAsPeer != null) {
+            return MessageObject.getPeerId(sendAsPeer);
+        }
+        return getUserConfig().getClientUserId();
+    }
+
+    private boolean containsCustomReaction(ArrayList<ReactionsLayoutInBubble.VisibleReaction> visibleReactions) {
+        if (visibleReactions == null) {
+            return false;
+        }
+        for (int i = 0; i < visibleReactions.size(); i++) {
+            if (visibleReactions.get(i).documentId != 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsChosenCustomReaction(TLRPC.TL_messageReactions reactions) {
+        if (reactions == null) {
+            return false;
+        }
+        for (int i = 0; i < reactions.results.size(); i++) {
+            TLRPC.ReactionCount reactionCount = reactions.results.get(i);
+            if (reactionCount.chosen && reactionCount.reaction instanceof TLRPC.TL_reactionCustomEmoji) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void requestUrlAuth(String url, ChatActivity parentFragment, boolean ask) {
