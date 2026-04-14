@@ -1,0 +1,7 @@
+﻿Massgram 12.5.6
+
+- Added Massgram+ features for Massgram-only premium stickers, custom emoji and todo messages between Massgram clients.
+- Official Telegram clients still see an unsupported Massgram message placeholder, while Massgram clients decode and render the hidden premium content locally.
+- Fixed Massgram premium transport, local premium gates and a crash during premium message decode.
+- Improved Massgram private-message encryption and crypto compatibility for client-to-client transport.
+- Added Massgram voice tools and fixed composer spacing around the voice pitch button.

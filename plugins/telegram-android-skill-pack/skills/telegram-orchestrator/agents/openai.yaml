@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Orchestrator"
+  short_description: "Route Telegram Android work safely"
+  default_prompt: "Use $telegram-orchestrator to plan and execute a Telegram Android-style change."

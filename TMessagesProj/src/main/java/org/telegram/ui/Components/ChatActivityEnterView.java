@@ -5958,7 +5958,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (voicePitchButton == null) {
             return;
         }
-        boolean enabled = MassgramConfigManager.getInstance().isVoicePitchEnabled() && MassgramConfigManager.getInstance().getVoicePitchSemitones() != 0;
+        boolean enabled = MassgramConfigManager.getInstance().isVoicePitchEnabled() && MassgramConfigManager.getInstance().getVoicePitchHalfSteps() != 0;
         int iconColor = enabled ? getThemedColor(Theme.key_chat_messagePanelSend) : getThemedColor(Theme.key_chat_messagePanelIcons);
         voicePitchButton.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.MULTIPLY));
     }
@@ -6011,17 +6011,51 @@ public class ChatActivityEnterView extends FrameLayout implements
         toggleCell.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL));
         linearLayout.addView(toggleCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        SlideIntChooseView sliderView = new SlideIntChooseView(parentActivity, resourcesProvider);
-        sliderView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
-        sliderView.set(
-            MassgramConfigManager.getInstance().getVoicePitchSemitones(),
-            SlideIntChooseView.Options.make(0, -12, 12, value -> formatMassgramPitchValue(value)),
-            value -> {
-                MassgramConfigManager.getInstance().setVoicePitchSemitones(value);
+        final SlideIntChooseView.Options sliderOptions = SlideIntChooseView.Options.make(0, -24, 24, value -> formatMassgramPitchValue(value));
+        final SlideIntChooseView[] sliderView = new SlideIntChooseView[1];
+        final Utilities.Callback<Integer>[] sliderCallback = new Utilities.Callback[1];
+
+        LinearLayout presetsLayout = new LinearLayout(parentActivity);
+        presetsLayout.setOrientation(LinearLayout.HORIZONTAL);
+        presetsLayout.setPadding(dp(16), dp(8), dp(16), dp(4));
+        ArrayList<TextView> presetButtons = new ArrayList<>();
+        for (int presetIndex = 0; presetIndex <= MassgramVoicePitchHelper.PRESET_HELIUM; presetIndex++) {
+            final int finalPresetIndex = presetIndex;
+            TextView presetButton = new TextView(parentActivity);
+            presetButton.setGravity(Gravity.CENTER);
+            presetButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            presetButton.setPadding(dp(10), dp(8), dp(10), dp(8));
+            presetButton.setText(getMassgramVoicePitchPresetLabel(finalPresetIndex));
+            presetButton.setOnClickListener(v -> {
+                int halfSteps = MassgramVoicePitchHelper.getPresetHalfSteps(finalPresetIndex);
+                MassgramConfigManager.getInstance().setVoicePitchHalfSteps(halfSteps);
+                sliderView[0].set(halfSteps, sliderOptions, sliderCallback[0]);
                 updateMassgramVoicePitchButtonState();
+                updateMassgramVoicePitchPresetButtons(presetButtons, halfSteps);
+            });
+            LinearLayout.LayoutParams presetParams = new LinearLayout.LayoutParams(0, LayoutHelper.WRAP_CONTENT, 1f);
+            if (presetIndex > 0) {
+                presetParams.leftMargin = dp(6);
             }
+            presetsLayout.addView(presetButton, presetParams);
+            presetButtons.add(presetButton);
+        }
+        linearLayout.addView(presetsLayout, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        sliderView[0] = new SlideIntChooseView(parentActivity, resourcesProvider);
+        sliderView[0].setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        sliderCallback[0] = value -> {
+                MassgramConfigManager.getInstance().setVoicePitchHalfSteps(value);
+                updateMassgramVoicePitchButtonState();
+                updateMassgramVoicePitchPresetButtons(presetButtons, value);
+            };
+        sliderView[0].set(
+            MassgramConfigManager.getInstance().getVoicePitchHalfSteps(),
+            sliderOptions,
+            sliderCallback[0]
         );
-        linearLayout.addView(sliderView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        linearLayout.addView(sliderView[0], LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        updateMassgramVoicePitchPresetButtons(presetButtons, MassgramConfigManager.getInstance().getVoicePitchHalfSteps());
 
         TextView infoView = new TextView(parentActivity);
         infoView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText4));
@@ -6042,10 +6076,36 @@ public class ChatActivityEnterView extends FrameLayout implements
     }
 
     private CharSequence formatMassgramPitchValue(int value) {
-        if (value == 0) {
-            return LocaleController.getString(R.string.MassgramVoicePitchNormal);
+        return MassgramVoicePitchHelper.formatPitchValue(value, LocaleController.getString(R.string.MassgramVoicePitchNormal));
+    }
+
+    private void updateMassgramVoicePitchPresetButtons(ArrayList<TextView> presetButtons, int halfSteps) {
+        int selectedIndex = MassgramVoicePitchHelper.findPresetIndex(halfSteps);
+        for (int i = 0; i < presetButtons.size(); i++) {
+            TextView presetButton = presetButtons.get(i);
+            boolean selected = i == selectedIndex;
+            int textColor = getThemedColor(selected ? Theme.key_featuredStickers_buttonText : Theme.key_windowBackgroundWhiteBlackText);
+            int backgroundColor = getThemedColor(selected ? Theme.key_featuredStickers_addButton : Theme.key_windowBackgroundGray);
+            presetButton.setTextColor(textColor);
+            presetButton.setBackground(Theme.createRoundRectDrawable(dp(16), backgroundColor));
         }
-        return String.format(Locale.US, "%+d st", value);
+    }
+
+    private String getMassgramVoicePitchPresetLabel(int presetIndex) {
+        switch (presetIndex) {
+            case MassgramVoicePitchHelper.PRESET_DEEP:
+                return LocaleController.getString(R.string.MassgramVoicePitchPresetDeep);
+            case MassgramVoicePitchHelper.PRESET_LOW:
+                return LocaleController.getString(R.string.MassgramVoicePitchPresetLow);
+            case MassgramVoicePitchHelper.PRESET_NORMAL:
+                return LocaleController.getString(R.string.MassgramVoicePitchPresetNormal);
+            case MassgramVoicePitchHelper.PRESET_BRIGHT:
+                return LocaleController.getString(R.string.MassgramVoicePitchPresetBright);
+            case MassgramVoicePitchHelper.PRESET_HELIUM:
+                return LocaleController.getString(R.string.MassgramVoicePitchPresetHelium);
+            default:
+                throw new IllegalArgumentException("Unknown preset index " + presetIndex);
+        }
     }
 
     public boolean isRecordingAudioVideo() {

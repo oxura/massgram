@@ -391,7 +391,12 @@
     <string name="MassgramSkip">Пропустить</string>
     <string name="MassgramVoicePitchTitle">Тон голоса</string>
     <string name="MassgramVoicePitchEnable">Включить изменение голоса</string>
-    <string name="MassgramVoicePitchEnableInfo">Применяет локальное изменение тональности к новым голосовым сообщениям до кодирования.</string>
-    <string name="MassgramVoicePitchInfo">Слайдер сдвигает голос от -12 до +12 полутонов. Massgram применяет эффект только к новым войсам и не ломает стандартный процесс записи Telegram.</string>
+    <string name="MassgramVoicePitchEnableInfo">Применяет локальное изменение тональности к новым голосовым сообщениям до кодирования, сохраняя исходную скорость речи.</string>
+    <string name="MassgramVoicePitchInfo">Используй пресеты или точную настройку от -12.0 до +12.0 полутонов. Massgram применяет эффект только к новым войсам и сохраняет исходную скорость записи.</string>
     <string name="MassgramVoicePitchNormal">Обычный</string>
+    <string name="MassgramVoicePitchPresetDeep">Глубокий</string>
+    <string name="MassgramVoicePitchPresetLow">Низкий</string>
+    <string name="MassgramVoicePitchPresetNormal">Обычный</string>
+    <string name="MassgramVoicePitchPresetBright">Яркий</string>
+    <string name="MassgramVoicePitchPresetHelium">Гелий</string>
 </resources>

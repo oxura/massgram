@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Feature Development"
+  short_description: "Add Telegram-style features incrementally"
+  default_prompt: "Use $telegram-feature-development to add this feature with a small Telegram-native diff."

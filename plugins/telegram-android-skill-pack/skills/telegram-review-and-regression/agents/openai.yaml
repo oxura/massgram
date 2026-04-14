@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Review & Regression"
+  short_description: "Review Telegram changes like a maintainer"
+  default_prompt: "Use $telegram-review-and-regression to review this Telegram Android change for regressions and AI-smell."

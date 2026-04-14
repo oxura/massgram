@@ -9069,7 +9069,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     hideActionMode(true);
                 }
                 if (onUnlocked != null) {
-                    onUnlocked.run();
+                    AndroidUtilities.runOnUIThread(onUnlocked);
                 }
                 return true;
             },

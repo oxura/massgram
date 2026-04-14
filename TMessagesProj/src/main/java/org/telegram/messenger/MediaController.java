@@ -1048,8 +1048,10 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     private final Object sync = new Object();
 
     private ArrayList<ByteBuffer> recordBuffers = new ArrayList<>();
-    private ArrayList<ByteBuffer> recordProcessedBuffers = new ArrayList<>();
     private ByteBuffer fileBuffer;
+    private final MassgramAudioProcessor recordAudioProcessor = new MassgramAudioProcessor();
+    private boolean recordVoicePitchEnabled;
+    private boolean recordVoicePitchFailed;
     public int recordBufferSize = 1280;
     public int sampleRate = 48000;
     private int sendAfterDone;
@@ -1113,39 +1115,12 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                     } catch (Exception e) {
                         FileLog.e(e);
                     }
-                    buffer.position(0);
+                    recordTimeCount += (long) len * 1000 / 2 / sampleRate;
                     final double amplitude = Math.sqrt(sum / len / 2);
-                    final ByteBuffer finalBuffer = maybeApplyVoicePitch(buffer, len);
-                    final ByteBuffer sourceBuffer = buffer;
-                    final boolean processedBuffer = finalBuffer != sourceBuffer;
-                    final boolean flush = len != buffer.capacity();
                     fileEncodingQueue.postRunnable(() -> {
-                        while (finalBuffer.hasRemaining()) {
-                            int oldLimit = -1;
-                            if (finalBuffer.remaining() > fileBuffer.remaining()) {
-                                oldLimit = finalBuffer.limit();
-                                finalBuffer.limit(fileBuffer.remaining() + finalBuffer.position());
-                            }
-                            fileBuffer.put(finalBuffer);
-                            if (fileBuffer.position() == fileBuffer.limit() || flush) {
-                                if (writeFrame(fileBuffer, !flush ? fileBuffer.limit() : finalBuffer.position()) != 0) {
-                                    fileBuffer.rewind();
-                                    recordTimeCount += fileBuffer.limit() / 2 / (sampleRate / 1000);
-                                    writtenFrame++;
-                                } else {
-                                    FileLog.e("writing frame failed");
-                                }
-                            }
-                            if (oldLimit != -1) {
-                                finalBuffer.limit(oldLimit);
-                            }
-                        }
+                        encodeRecordedBuffer(buffer, len);
                         recordQueue.postRunnable(() -> {
-                            recordBuffers.add(sourceBuffer);
-                            if (processedBuffer) {
-                                finalBuffer.clear();
-                                recordProcessedBuffers.add(finalBuffer);
-                            }
+                            recordBuffers.add(buffer);
                         });
                     });
                     recordQueue.postRunnable(recordRunnable);
@@ -1160,47 +1135,100 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         }
     };
 
-    private ByteBuffer maybeApplyVoicePitch(ByteBuffer sourceBuffer, int byteCount) {
-        if (!MassgramConfigManager.getInstance().isVoicePitchEnabled()) {
-            sourceBuffer.position(0);
-            sourceBuffer.limit(byteCount);
-            return sourceBuffer;
+    private void prepareRecordAudioProcessor(boolean enabled, float pitchFactor) {
+        recordAudioProcessor.reset();
+        recordVoicePitchEnabled = enabled;
+        recordVoicePitchFailed = false;
+        if (!enabled) {
+            return;
         }
-        int semitones = MassgramConfigManager.getInstance().getVoicePitchSemitones();
-        if (semitones == 0) {
-            sourceBuffer.position(0);
-            sourceBuffer.limit(byteCount);
-            return sourceBuffer;
+        if (!recordAudioProcessor.configure(sampleRate, 1, pitchFactor)) {
+            recordVoicePitchFailed = true;
+            FileLog.e("voice pitch processor init failed, falling back to raw pcm");
         }
-        float pitchFactor = MassgramConfigManager.getInstance().getVoicePitchFactor();
-        int requiredCapacity = Math.max(recordBufferSize * 2, Math.round(byteCount / Math.max(0.35f, pitchFactor)) + 16);
-        ByteBuffer outputBuffer = obtainProcessedRecordBuffer(requiredCapacity);
-        int processedLength = MassgramAudioProcessor.applyPitchShift(sourceBuffer, byteCount, outputBuffer, pitchFactor);
-        if (processedLength <= 0) {
-            outputBuffer.clear();
-            recordProcessedBuffers.add(outputBuffer);
-            sourceBuffer.position(0);
-            sourceBuffer.limit(byteCount);
-            return sourceBuffer;
-        }
-        outputBuffer.position(0);
-        outputBuffer.limit(processedLength);
-        return outputBuffer;
     }
 
-    private ByteBuffer obtainProcessedRecordBuffer(int requiredCapacity) {
-        for (int i = 0; i < recordProcessedBuffers.size(); i++) {
-            ByteBuffer buffer = recordProcessedBuffers.get(i);
-            if (buffer.capacity() >= requiredCapacity) {
-                recordProcessedBuffers.remove(i);
-                buffer.clear();
-                buffer.order(ByteOrder.nativeOrder());
-                return buffer;
+    private void encodeRecordedBuffer(ByteBuffer sourceBuffer, int byteCount) {
+        if (byteCount <= 0) {
+            return;
+        }
+        if (!recordVoicePitchEnabled || recordVoicePitchFailed) {
+            writeRecordedPcm(sourceBuffer, byteCount, false);
+            return;
+        }
+        try {
+            recordAudioProcessor.queueInput(sourceBuffer, byteCount);
+            drainRecordedProcessorOutput();
+        } catch (Exception e) {
+            FileLog.e(e);
+            recordVoicePitchFailed = true;
+            recordAudioProcessor.reset();
+            writeRecordedPcm(sourceBuffer, byteCount, false);
+        }
+    }
+
+    private void finishRecordedSegment() {
+        if (recordVoicePitchEnabled && !recordVoicePitchFailed) {
+            try {
+                recordAudioProcessor.queueEndOfStream();
+                drainRecordedProcessorOutput();
+            } catch (Exception e) {
+                FileLog.e(e);
+                recordVoicePitchFailed = true;
             }
         }
-        ByteBuffer buffer = ByteBuffer.allocateDirect(requiredCapacity);
-        buffer.order(ByteOrder.nativeOrder());
-        return buffer;
+        flushRecordedPcmFrame();
+        stopRecord();
+        recordAudioProcessor.reset();
+        recordVoicePitchEnabled = false;
+        recordVoicePitchFailed = false;
+    }
+
+    private void drainRecordedProcessorOutput() {
+        while (true) {
+            ByteBuffer outputBuffer = recordAudioProcessor.getOutput();
+            if (!outputBuffer.hasRemaining()) {
+                break;
+            }
+            writeRecordedPcm(outputBuffer, outputBuffer.remaining(), false);
+        }
+    }
+
+    private void writeRecordedPcm(ByteBuffer sourceBuffer, int byteCount, boolean flushPartial) {
+        ByteBuffer input = sourceBuffer.duplicate().order(ByteOrder.nativeOrder());
+        input.position(0);
+        input.limit(Math.min(byteCount, input.limit()));
+        while (input.hasRemaining()) {
+            int chunkSize = Math.min(input.remaining(), fileBuffer.remaining());
+            int oldLimit = input.limit();
+            input.limit(input.position() + chunkSize);
+            fileBuffer.put(input);
+            input.limit(oldLimit);
+            if (!fileBuffer.hasRemaining()) {
+                writeRecordedFrame(fileBuffer.limit());
+            }
+        }
+        if (flushPartial && fileBuffer.position() > 0) {
+            writeRecordedFrame(fileBuffer.position());
+        }
+    }
+
+    private void flushRecordedPcmFrame() {
+        if (fileBuffer.position() > 0) {
+            writeRecordedFrame(fileBuffer.position());
+        }
+    }
+
+    private void writeRecordedFrame(int length) {
+        if (length <= 0) {
+            return;
+        }
+        if (writeFrame(fileBuffer, length) != 0) {
+            writtenFrame++;
+        } else {
+            FileLog.e("writing frame failed");
+        }
+        fileBuffer.rewind();
     }
 
     private float audioVolume;
@@ -1421,7 +1449,6 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 recordBufferSize = minBuferSize;
 
                 recordBuffers.clear();
-                recordProcessedBuffers.clear();
                 for (int a = 0; a < 5; a++) {
                     ByteBuffer buffer = ByteBuffer.allocateDirect(recordBufferSize);
                     buffer.order(ByteOrder.nativeOrder());
@@ -1493,6 +1520,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         });
 
         fileBuffer = ByteBuffer.allocateDirect(1920);
+        fileBuffer.order(ByteOrder.nativeOrder());
 
         AndroidUtilities.runOnUIThread(() -> {
             for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
@@ -4665,8 +4693,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 audioRecorder.stop();
                 audioRecorder.release();
                 audioRecorder = null;
-                recordQueue.postRunnable(() -> {
-                    stopRecord();
+                fileEncodingQueue.postRunnable(() -> {
+                    finishRecordedSegment();
                     final TLRPC.TL_document audioToSend = recordingAudio;
                     final File recordingAudioFileToSend = joinRecord(recordingPrevAudioFile, recordingAudioFile, audioToSend);
                     if (audioToSend == null || recordingAudioFileToSend == null) {
@@ -4719,6 +4747,11 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                         }
                         return;
                     }
+
+                    int halfSteps = MassgramConfigManager.getInstance().getVoicePitchHalfSteps();
+                    boolean enableVoicePitch = MassgramConfigManager.getInstance().isVoicePitchEnabled() && halfSteps != 0;
+                    float voicePitchFactor = enableVoicePitch ? MassgramConfigManager.getInstance().getVoicePitchFactor() : 1.0f;
+                    fileEncodingQueue.postRunnable(() -> prepareRecordAudioProcessor(enableVoicePitch, voicePitchFactor));
 
                     AndroidUtilities.runOnUIThread(() -> {
                         requestRecordAudioFocus(true);
@@ -4817,6 +4850,10 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 recordQuickReplyShortcut = quick_shortcut;
                 recordQuickReplyShortcutId = quick_shortcut_id;
                 fileBuffer.rewind();
+                int halfSteps = MassgramConfigManager.getInstance().getVoicePitchHalfSteps();
+                boolean enableVoicePitch = MassgramConfigManager.getInstance().isVoicePitchEnabled() && halfSteps != 0;
+                float voicePitchFactor = enableVoicePitch ? MassgramConfigManager.getInstance().getVoicePitchFactor() : 1.0f;
+                fileEncodingQueue.postRunnable(() -> prepareRecordAudioProcessor(enableVoicePitch, voicePitchFactor));
 
                 audioRecorder.startRecording();
             } catch (Exception e) {
@@ -4914,73 +4951,76 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     }
 
     private void stopRecordingInternal(final int send, boolean notify, int scheduleDate, boolean once, long payStars) {
-        if (send != 0 && recordingAudioFile != null) {
+        final File recordingAudioFileToSend_ = recordingAudioFile;
+        final File recordingPrevAudioFileToSend_ = recordingPrevAudioFile;
+        if (recordingAudioFileToSend_ != null) {
             final TLRPC.TL_document audioToSend = recordingAudio;
-            final File recordingAudioFileToSend_ = recordingAudioFile;
-            final File recordingPrevAudioFileToSend_ = recordingPrevAudioFile;
             if (BuildVars.LOGS_ENABLED) {
                 FileLog.d("stop recording internal filename " + (recordingAudioFile.getPath()));
             }
             fileEncodingQueue.postRunnable(() -> {
-                stopRecord();
-                final File recordingAudioFileToSend = joinRecord(recordingPrevAudioFileToSend_, recordingAudioFileToSend_, audioToSend);
-                if (recordingAudioFileToSend == null) {
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.d("stop recording recordingAudioFileToSend == null in queue");
-                    }
-                    return;
-                }
-                if (BuildVars.LOGS_ENABLED) {
-                    FileLog.d("stop recording internal in queue " + (recordingAudioFileToSend.exists() + " " + recordingAudioFileToSend.length()));
-                }
-                AndroidUtilities.runOnUIThread(() -> {
-                    if (BuildVars.LOGS_ENABLED) {
-                        FileLog.d("stop recording internal " + (recordingAudioFileToSend == null ? "null" : recordingAudioFileToSend.exists() + " " + recordingAudioFileToSend.length() + " " + " recordTimeCount " + recordTimeCount + " writedFrames" + writtenFrame));
-                    }
-                    boolean fileExist = recordingAudioFileToSend != null && recordingAudioFileToSend.exists();
-                    if (!fileExist && BuildVars.DEBUG_VERSION) {
-                        FileLog.e(new RuntimeException("file not found :( recordTimeCount " + recordTimeCount + " writedFrames" + writtenFrame));
-                    }
-                    MediaDataController.getInstance(recordingCurrentAccount).pushDraftVoiceMessage(recordDialogId, recordTopicId, null);
-                    audioToSend.date = ConnectionsManager.getInstance(recordingCurrentAccount).getCurrentTime();
-                    audioToSend.size = recordingAudioFileToSend == null ? 0 : (int) recordingAudioFileToSend.length();
-                    TLRPC.TL_documentAttributeAudio attributeAudio = new TLRPC.TL_documentAttributeAudio();
-                    attributeAudio.voice = true;
-                    attributeAudio.waveform = getWaveform(recordingAudioFileToSend.getAbsolutePath());
-                    if (attributeAudio.waveform != null) {
-                        attributeAudio.flags |= 4;
-                    }
-                    long duration = recordTimeCount;
-                    attributeAudio.duration = recordTimeCount / 1000.0;
-                    audioToSend.attributes.clear();
-                    audioToSend.attributes.add(attributeAudio);
-                    if (duration > 700) {
-                        if (send == 1) {
-                            SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(audioToSend, null, recordingAudioFileToSend.getAbsolutePath(), recordDialogId, recordReplyingMsg, recordReplyingTopMsg, null, null, null, null, notify, scheduleDate, 0, once ? 0x7FFFFFFF : 0, null, null, false);
-                            params.monoForumPeer = recordMonoForumPeerId;
-                            params.suggestionParams = recordMonoForumSuggestionParams;
-                            params.replyToStoryItem = recordReplyingStory;
-                            params.quick_reply_shortcut = recordQuickReplyShortcut;
-                            params.quick_reply_shortcut_id = recordQuickReplyShortcutId;
-                            params.payStars = payStars;
-                            SendMessagesHelper.getInstance(recordingCurrentAccount).sendMessage(params);
+                finishRecordedSegment();
+                if (send != 0) {
+                    final File recordingAudioFileToSend = joinRecord(recordingPrevAudioFileToSend_, recordingAudioFileToSend_, audioToSend);
+                    if (recordingAudioFileToSend == null) {
+                        if (BuildVars.LOGS_ENABLED) {
+                            FileLog.d("stop recording recordingAudioFileToSend == null in queue");
                         }
-                        NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.audioDidSent, recordingGuid, send == 2 ? audioToSend : null, send == 2 ? recordingAudioFileToSend.getAbsolutePath() : null);
-                    } else {
-                        NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.audioRecordTooShort, recordingGuid, false, (int) duration);
-                        if (recordingAudioFileToSend != null) {
+                        return;
+                    }
+                    if (BuildVars.LOGS_ENABLED) {
+                        FileLog.d("stop recording internal in queue " + (recordingAudioFileToSend.exists() + " " + recordingAudioFileToSend.length()));
+                    }
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (BuildVars.LOGS_ENABLED) {
+                            FileLog.d("stop recording internal " + (recordingAudioFileToSend == null ? "null" : recordingAudioFileToSend.exists() + " " + recordingAudioFileToSend.length() + " " + " recordTimeCount " + recordTimeCount + " writedFrames" + writtenFrame));
+                        }
+                        boolean fileExist = recordingAudioFileToSend.exists();
+                        if (!fileExist && BuildVars.DEBUG_VERSION) {
+                            FileLog.e(new RuntimeException("file not found :( recordTimeCount " + recordTimeCount + " writedFrames" + writtenFrame));
+                        }
+                        MediaDataController.getInstance(recordingCurrentAccount).pushDraftVoiceMessage(recordDialogId, recordTopicId, null);
+                        audioToSend.date = ConnectionsManager.getInstance(recordingCurrentAccount).getCurrentTime();
+                        audioToSend.size = (int) recordingAudioFileToSend.length();
+                        TLRPC.TL_documentAttributeAudio attributeAudio = new TLRPC.TL_documentAttributeAudio();
+                        attributeAudio.voice = true;
+                        attributeAudio.waveform = getWaveform(recordingAudioFileToSend.getAbsolutePath());
+                        if (attributeAudio.waveform != null) {
+                            attributeAudio.flags |= 4;
+                        }
+                        long duration = recordTimeCount;
+                        attributeAudio.duration = recordTimeCount / 1000.0;
+                        audioToSend.attributes.clear();
+                        audioToSend.attributes.add(attributeAudio);
+                        if (duration > 700) {
+                            if (send == 1) {
+                                SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(audioToSend, null, recordingAudioFileToSend.getAbsolutePath(), recordDialogId, recordReplyingMsg, recordReplyingTopMsg, null, null, null, null, notify, scheduleDate, 0, once ? 0x7FFFFFFF : 0, null, null, false);
+                                params.monoForumPeer = recordMonoForumPeerId;
+                                params.suggestionParams = recordMonoForumSuggestionParams;
+                                params.replyToStoryItem = recordReplyingStory;
+                                params.quick_reply_shortcut = recordQuickReplyShortcut;
+                                params.quick_reply_shortcut_id = recordQuickReplyShortcutId;
+                                params.payStars = payStars;
+                                SendMessagesHelper.getInstance(recordingCurrentAccount).sendMessage(params);
+                            }
+                            NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.audioDidSent, recordingGuid, send == 2 ? audioToSend : null, send == 2 ? recordingAudioFileToSend.getAbsolutePath() : null);
+                        } else {
+                            NotificationCenter.getInstance(recordingCurrentAccount).postNotificationName(NotificationCenter.audioRecordTooShort, recordingGuid, false, (int) duration);
                             AutoDeleteMediaTask.unlockFile(recordingAudioFileToSend);
                             recordingAudioFileToSend.delete();
                         }
+                        requestRecordAudioFocus(false);
+                    });
+                } else {
+                    AutoDeleteMediaTask.unlockFile(recordingAudioFileToSend_);
+                    recordingAudioFileToSend_.delete();
+                    if (recordingPrevAudioFileToSend_ != null) {
+                        recordingPrevAudioFileToSend_.delete();
                     }
                     requestRecordAudioFocus(false);
-                });
+                }
             });
         } else {
-            AutoDeleteMediaTask.unlockFile(recordingAudioFile);
-            if (recordingAudioFile != null) {
-                recordingAudioFile.delete();
-            }
             requestRecordAudioFocus(false);
         }
         try {

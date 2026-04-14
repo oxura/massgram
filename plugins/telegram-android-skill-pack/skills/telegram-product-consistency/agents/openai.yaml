@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Product Consistency"
+  short_description: "Keep features aligned with Telegram"
+  default_prompt: "Use $telegram-product-consistency to check whether this feature belongs in Telegram Android."

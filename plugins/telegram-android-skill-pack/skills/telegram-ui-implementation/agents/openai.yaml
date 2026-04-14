@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram UI Implementation"
+  short_description: "Build Telegram-native Android UI"
+  default_prompt: "Use $telegram-ui-implementation to implement this Android UI in Telegram style."

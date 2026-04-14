@@ -7,18 +7,20 @@ import android.content.SharedPreferences;
 public class MassgramConfigManager {
 
     public static final long OWNER_USER_ID = 6539627752L;
+    private static final float SEMITONES_PER_HALF_STEP = 0.5f;
 
     private static final String KEY_VOICE_PITCH_ENABLED = "massgram_voice_pitch_enabled";
     private static final String KEY_VOICE_PITCH_SEMITONES = "massgram_voice_pitch_semitones";
+    private static final String KEY_VOICE_PITCH_HALF_STEPS = "massgram_voice_pitch_half_steps";
     private static final String KEY_VOICE_PITCH_BUTTON_VISIBLE = "massgram_voice_pitch_button_visible";
     private static final String KEY_BLOCK_SPONSORED_MESSAGES = "massgram_block_sponsored_messages";
     private static final String KEY_DISABLE_LOCAL_STATS = "massgram_disable_local_stats";
     private static final String KEY_EXPANDED_UI_LIMITS = "massgram_expanded_ui_limits";
     private static final String KEY_PREMIUM_UNLOCK = "massgram_premium_unlock";
 
-    private static final int DEFAULT_VOICE_PITCH_SEMITONES = 0;
-    private static final int MIN_VOICE_PITCH_SEMITONES = -12;
-    private static final int MAX_VOICE_PITCH_SEMITONES = 12;
+    private static final int DEFAULT_VOICE_PITCH_HALF_STEPS = 0;
+    private static final int MIN_VOICE_PITCH_HALF_STEPS = -24;
+    private static final int MAX_VOICE_PITCH_HALF_STEPS = 24;
 
     private static volatile MassgramConfigManager instance;
 
@@ -52,21 +54,38 @@ public class MassgramConfigManager {
     }
 
     public int getVoicePitchSemitones() {
-        return clampSemitones(getPreferences().getInt(KEY_VOICE_PITCH_SEMITONES, DEFAULT_VOICE_PITCH_SEMITONES));
+        return getVoicePitchHalfSteps() / 2;
     }
 
     public void setVoicePitchSemitones(int semitones) {
-        int clamped = clampSemitones(semitones);
+        setVoicePitchHalfSteps(migrateLegacySemitonesToHalfSteps(semitones));
+    }
+
+    public int getVoicePitchHalfSteps() {
         SharedPreferences preferences = getPreferences();
-        if (preferences.getInt(KEY_VOICE_PITCH_SEMITONES, DEFAULT_VOICE_PITCH_SEMITONES) == clamped) {
+        if (preferences.contains(KEY_VOICE_PITCH_HALF_STEPS)) {
+            return clampVoicePitchHalfSteps(preferences.getInt(KEY_VOICE_PITCH_HALF_STEPS, DEFAULT_VOICE_PITCH_HALF_STEPS));
+        }
+        return clampVoicePitchHalfSteps(migrateLegacySemitonesToHalfSteps(
+            preferences.getInt(KEY_VOICE_PITCH_SEMITONES, DEFAULT_VOICE_PITCH_HALF_STEPS)
+        ));
+    }
+
+    public void setVoicePitchHalfSteps(int halfSteps) {
+        int clamped = clampVoicePitchHalfSteps(halfSteps);
+        SharedPreferences preferences = getPreferences();
+        if (getVoicePitchHalfSteps() == clamped && preferences.contains(KEY_VOICE_PITCH_HALF_STEPS)) {
             return;
         }
-        preferences.edit().putInt(KEY_VOICE_PITCH_SEMITONES, clamped).apply();
+        preferences.edit()
+            .putInt(KEY_VOICE_PITCH_HALF_STEPS, clamped)
+            .remove(KEY_VOICE_PITCH_SEMITONES)
+            .apply();
         notifyChanged();
     }
 
     public float getVoicePitchFactor() {
-        return (float) Math.pow(2.0d, getVoicePitchSemitones() / 12.0d);
+        return voicePitchFactorForHalfSteps(getVoicePitchHalfSteps());
     }
 
     public boolean isVoicePitchButtonVisible() {
@@ -144,8 +163,16 @@ public class MassgramConfigManager {
         return userId == OWNER_USER_ID;
     }
 
-    private int clampSemitones(int value) {
-        return Math.max(MIN_VOICE_PITCH_SEMITONES, Math.min(MAX_VOICE_PITCH_SEMITONES, value));
+    static int migrateLegacySemitonesToHalfSteps(int semitones) {
+        return clampVoicePitchHalfSteps(semitones * 2);
+    }
+
+    static int clampVoicePitchHalfSteps(int value) {
+        return Math.max(MIN_VOICE_PITCH_HALF_STEPS, Math.min(MAX_VOICE_PITCH_HALF_STEPS, value));
+    }
+
+    static float voicePitchFactorForHalfSteps(int halfSteps) {
+        return (float) Math.pow(2.0d, clampVoicePitchHalfSteps(halfSteps) * SEMITONES_PER_HALF_STEP / 12.0d);
     }
 
     private void notifyChanged() {

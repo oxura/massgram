@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Code Style & Architecture"
+  short_description: "Match conservative Telegram engineering"
+  default_prompt: "Use $telegram-code-style-and-architecture to keep this Android change aligned with Telegram-style code."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Component Reuse"
+  short_description: "Find and reuse Telegram-style patterns"
+  default_prompt: "Use $telegram-component-reuse to find the closest existing Telegram Android pattern before coding."

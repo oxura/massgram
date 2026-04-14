@@ -1,0 +1,42 @@
+{
+  "name": "telegram-android-skill-pack",
+  "version": "0.1.0",
+  "description": "Telegram Android skill pack for conservative UI, product, reuse, and review workflows.",
+  "author": {
+    "name": "@awenqo",
+    "email": "noreply@example.invalid",
+    "url": "https://example.invalid/codex-local"
+  },
+  "homepage": "https://example.invalid/telegram-android-skill-pack",
+  "repository": "https://example.invalid/telegram-android-skill-pack",
+  "license": "UNLICENSED",
+  "keywords": [
+    "telegram",
+    "android",
+    "skills",
+    "ui",
+    "review"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Telegram Android Skill Pack",
+    "shortDescription": "Telegram-native Android coding skills",
+    "longDescription": "Reusable skill pack for Telegram Android and Telegram-style forks. It pushes Codex toward Telegram-like product thinking, restrained UI, component reuse, safe legacy edits, conservative engineering, and strong regression review.",
+    "developerName": "@awenqo",
+    "category": "Engineering",
+    "capabilities": [
+      "Write",
+      "Review",
+      "Plan"
+    ],
+    "websiteURL": "https://example.invalid/telegram-android-skill-pack",
+    "privacyPolicyURL": "https://example.invalid/privacy",
+    "termsOfServiceURL": "https://example.invalid/terms",
+    "defaultPrompt": [
+      "Implement this change as a Telegram Android maintainer would.",
+      "Review this Telegram Android diff for UI and regression risk.",
+      "Plan the smallest Telegram-native change for this feature."
+    ],
+    "brandColor": "#229ED9"
+  }
+}

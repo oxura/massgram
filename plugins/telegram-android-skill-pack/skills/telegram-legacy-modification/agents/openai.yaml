@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Legacy Modification"
+  short_description: "Edit old Telegram code surgically"
+  default_prompt: "Use $telegram-legacy-modification to change existing Telegram Android code with minimal risk."

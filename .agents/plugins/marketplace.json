@@ -1,0 +1,20 @@
+{
+  "name": "telegram-android-local",
+  "interface": {
+    "displayName": "Telegram Android Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "telegram-android-skill-pack",
+      "source": {
+        "source": "local",
+        "path": "./plugins/telegram-android-skill-pack"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Engineering"
+    }
+  ]
+}

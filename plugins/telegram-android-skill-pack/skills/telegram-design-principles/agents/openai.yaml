@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Design Principles"
+  short_description: "Apply restrained Telegram UI judgment"
+  default_prompt: "Use $telegram-design-principles to judge whether this UI feels native to Telegram Android."
