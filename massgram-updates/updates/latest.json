@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.5.6",
-    "versionCode":  65949,
+    "versionName":  "12.6.3",
+    "versionCode":  665739,
     "apkUrl":  "https://github.com/oxura/massgram/releases/latest/download/massgram.apk",
-    "sha256":  "a1116e7d327b6252ab38758c2465adf5e642e901597eab691a2ac5a931f95ca8",
-    "apkSize":  131465050,
-    "changelog":  "Massgram 12.5.6\n\n- Added Massgram+ features for Massgram-only premium stickers, custom emoji and todo messages between Massgram clients.\n- Official Telegram clients still see an unsupported Massgram message placeholder, while Massgram clients decode and render the hidden premium content locally.\n- Fixed Massgram premium transport, local premium gates and a crash during premium message decode.\n- Improved Massgram private-message encryption and crypto compatibility for client-to-client transport.\n- Added Massgram voice tools and fixed composer spacing around the voice pitch button."
+    "sha256":  "42b6eb6afb065ddacfb0b8f1e9c4001edc2e09396360e5a2c8b075608d98f0aa",
+    "apkSize":  133050971,
+    "changelog":  "Unified chat lock color and stronger locked preview blur."
 }
 

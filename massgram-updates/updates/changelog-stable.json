@@ -1,5 +1,11 @@
 ﻿[
     {
+        "versionName":  "12.6.3",
+        "versionCode":  665739,
+        "publishedAt":  "2026-04-14T04:53:31Z",
+        "changelog":  "Unified chat lock color and stronger locked preview blur."
+    },
+    {
         "versionName":  "12.5.6",
         "versionCode":  65949,
         "publishedAt":  "2026-04-03T10:35:57Z",

@@ -1050,9 +1050,13 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     private BlurMaskFilter lockedPreviewBlurMaskFilter;
 
+    private Paint getLockedPreviewBadgePaint() {
+        return Theme.dialogs_countPaint;
+    }
+
     private BlurMaskFilter getLockedPreviewBlurMaskFilter() {
         if (lockedPreviewBlurMaskFilter == null) {
-            lockedPreviewBlurMaskFilter = new BlurMaskFilter(dp(3), BlurMaskFilter.Blur.NORMAL);
+            lockedPreviewBlurMaskFilter = new BlurMaskFilter(dp(3) * 1.2f, BlurMaskFilter.Blur.NORMAL);
         }
         return lockedPreviewBlurMaskFilter;
     }
@@ -5057,7 +5061,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     private void drawCounter(Canvas canvas, boolean drawCounterMuted, int countTop, int countLeftLocal, int countLeftOld, float globalScale, boolean outline) {
         if (shouldDrawLockedPreview()) {
-            Paint backgroundPaint = drawCounterMuted || currentDialogFolderId != 0 ? Theme.dialogs_countGrayPaint : Theme.dialogs_countPaint;
+            Paint backgroundPaint = getLockedPreviewBadgePaint();
             int oldBackgroundAlpha = backgroundPaint.getAlpha();
             RectF lockRect = AndroidUtilities.rectTmp;
             lockRect.set(countLeftLocal, countTop, countLeftLocal + dp(24), countTop + dp(24));
@@ -5094,7 +5098,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     lockRect.right - badgeWidth * 0.65f + badgeWidth,
                     lockRect.top - dp(4) + dp(16)
                 );
-                Paint badgePaint = drawCounterMuted ? Theme.dialogs_countGrayPaint : Theme.dialogs_countPaint;
+                Paint badgePaint = getLockedPreviewBadgePaint();
                 canvas.drawRoundRect(badgeRect, dp(8), dp(8), badgePaint);
                 if (!TextUtils.isEmpty(badgeText)) {
                     canvas.drawText(
