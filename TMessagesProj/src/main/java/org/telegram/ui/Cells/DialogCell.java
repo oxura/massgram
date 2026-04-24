@@ -1051,7 +1051,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private BlurMaskFilter lockedPreviewBlurMaskFilter;
 
     private Paint getLockedPreviewBadgePaint() {
-        return Theme.dialogs_countPaint;
+        return Theme.dialogs_countGrayPaint;
     }
 
     private BlurMaskFilter getLockedPreviewBlurMaskFilter() {

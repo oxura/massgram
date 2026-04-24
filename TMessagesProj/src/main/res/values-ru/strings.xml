@@ -317,8 +317,8 @@
     <string name="MassgramDeveloperHandle">@awenqo</string>
     <string name="MassgramDeveloperInfo">По вопросам о Massgram, партнёрству, фидбеку по текущему функционалу или предложениям новых функций можно написать разработчику в Telegram.</string>
     <string name="MassgramContributorTitle">Тестирование и разработка</string>
-    <string name="MassgramContributorHandle">@kakadkl</string>
-    <string name="MassgramContributorInfo">Помогал с тестированием мода и доработкой части процесса разработки.</string>
+    <string name="MassgramContributorHandle">@tttmochka</string>
+    <string name="MassgramContributorInfo">Тестировала мод и помогала с доработкой части процесса разработки.</string>
     <string name="MassgramOwnerStats">Статистика Massgram</string>
     <string name="MassgramOwnerStatsInfo">Экран только для владельца с метриками релизов, активных клиентов Massgram и поиском по пользователям.</string>
     <string name="MassgramOwnerOverview">Обзор</string>

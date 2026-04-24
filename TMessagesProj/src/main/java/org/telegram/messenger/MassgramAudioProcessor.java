@@ -49,8 +49,8 @@ public final class MassgramAudioProcessor {
             return;
         }
         ByteBuffer copy = input.duplicate().order(ByteOrder.nativeOrder());
-        copy.position(copy.position());
-        copy.limit(Math.min(copy.position() + byteCount, copy.limit()));
+        copy.position(0);
+        copy.limit(Math.min(byteCount, copy.capacity()));
         if (passthrough) {
             ByteBuffer output = ByteBuffer.allocateDirect(copy.remaining()).order(ByteOrder.nativeOrder());
             output.put(copy);

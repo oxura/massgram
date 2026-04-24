@@ -214,6 +214,7 @@
             android:supportsPictureInPicture="true"
             android:hardwareAccelerated="true"
             android:launchMode="singleTask"
+            android:documentLaunchMode="never"
             android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>

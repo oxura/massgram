@@ -24,6 +24,7 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.Dialog;
 import android.app.PictureInPictureParams;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -278,10 +279,74 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     private ArrayList<Parcelable> importingStickers;
     private ArrayList<String> importingStickersEmoji;
     private String importingStickersSoftware;
+    private String pendingShareIntentKey;
+    private boolean shareIntentSelectOpen;
 
     private ActionMode visibleActionMode;
 
     private boolean wasMutedByAdminRaisedHand;
+
+    private static boolean isExternalShareIntent(Intent intent) {
+        if (intent == null) {
+            return false;
+        }
+        String action = intent.getAction();
+        return Intent.ACTION_SEND.equals(action) || Intent.ACTION_SEND_MULTIPLE.equals(action);
+    }
+
+    private static String createShareIntentKey(Intent intent) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(intent.getAction()).append('|');
+        builder.append(intent.getType()).append('|');
+        Uri data = intent.getData();
+        if (data != null) {
+            builder.append(data);
+        }
+        Bundle extras = intent.getExtras();
+        if (extras != null) {
+            appendShareExtra(builder, extras, Intent.EXTRA_TEXT);
+            appendShareExtra(builder, extras, Intent.EXTRA_SUBJECT);
+            appendShareExtra(builder, extras, Intent.EXTRA_STREAM);
+            ArrayList<Parcelable> streams = extras.getParcelableArrayList(Intent.EXTRA_STREAM);
+            if (streams != null) {
+                builder.append("|streams=");
+                for (int i = 0; i < streams.size(); i++) {
+                    builder.append(streams.get(i)).append(';');
+                }
+            }
+        }
+        ClipData clipData = intent.getClipData();
+        if (clipData != null) {
+            builder.append("|clip=");
+            for (int i = 0; i < clipData.getItemCount(); i++) {
+                ClipData.Item item = clipData.getItemAt(i);
+                builder.append(item.getUri()).append(':').append(item.getText()).append(';');
+            }
+        }
+        return builder.toString();
+    }
+
+    private static void appendShareExtra(StringBuilder builder, Bundle extras, String key) {
+        Object value = extras.get(key);
+        if (value != null) {
+            builder.append('|').append(key).append('=').append(value);
+        }
+    }
+
+    private boolean isForwardShareSelectVisible() {
+        return isLastFragmentDialogsActivity(actionBarLayout) || isLastFragmentDialogsActivity(layersActionBarLayout);
+    }
+
+    private static boolean isLastFragmentDialogsActivity(INavigationLayout layout) {
+        return layout != null
+                && !layout.getFragmentStack().isEmpty()
+                && layout.getFragmentStack().get(layout.getFragmentStack().size() - 1) instanceof DialogsActivity;
+    }
+
+    private void clearPendingShareIntent() {
+        pendingShareIntentKey = null;
+        shareIntentSelectOpen = false;
+    }
 
     private final PipActivityController pipActivityController = new PipActivityController(this);
     private final IPipActivityHandler pipActivityHandler = pipActivityController.getHandler();
@@ -1515,6 +1580,14 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 passcodeSaveIntentIsRestore = restore;
                 return false;
             }
+        }
+        final boolean isShareIntent = isExternalShareIntent(intent);
+        final String shareIntentKey = isShareIntent ? createShareIntentKey(intent) : null;
+        if (shareIntentKey != null && shareIntentSelectOpen && shareIntentKey.equals(pendingShareIntentKey) && isForwardShareSelectVisible()) {
+            return true;
+        }
+        if (!isShareIntent) {
+            clearPendingShareIntent();
         }
         boolean pushOpened = false;
         long push_user_id = 0;
@@ -3048,6 +3121,8 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     NotificationCenter.getInstance(intentAccount[0]).postNotificationName(NotificationCenter.closeChats);
                 }
                 if (dialogId == 0) {
+                    pendingShareIntentKey = shareIntentKey;
+                    shareIntentSelectOpen = shareIntentKey != null;
                     openDialogsToSend(false);
                     pushOpened = true;
                 } else {
@@ -6114,6 +6189,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         contactsToSend = null;
         contactsToSendUri = null;
         exportingChatUri = null;
+        clearPendingShareIntent();
         return true;
     }
 
@@ -6378,6 +6454,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         contactsToSend = null;
         contactsToSendUri = null;
         exportingChatUri = null;
+        clearPendingShareIntent();
         return true;
     }
 

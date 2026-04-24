@@ -2342,7 +2342,7 @@
     <string name="MassgramDeveloperHandle">@awenqo</string>
     <string name="MassgramDeveloperInfo">For questions about Massgram, partnership requests, feedback on current functionality, or suggestions for new features, contact the developer in Telegram.</string>
     <string name="MassgramContributorTitle">Testing and development</string>
-    <string name="MassgramContributorHandle">@kakadkl</string>
+    <string name="MassgramContributorHandle">@tttmochka</string>
     <string name="MassgramContributorInfo">Helped with testing the mod and refining parts of the development workflow.</string>
     <string name="MassgramOwnerStats">Massgram stats</string>
     <string name="MassgramOwnerStatsInfo">Owner-only dashboard with release metrics, active Massgram clients and a searchable user list.</string>

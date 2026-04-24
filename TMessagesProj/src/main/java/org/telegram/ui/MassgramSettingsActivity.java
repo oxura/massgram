@@ -1023,7 +1023,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
 
         private void bind(CharSequence developerTitle, CharSequence developerHandle, CharSequence developerDescription, CharSequence contributorTitle, CharSequence contributorHandle, CharSequence contributorDescription) {
             developerLine.bind(developerTitle, developerHandle, developerDescription, "awenqo");
-            contributorLine.bind(contributorTitle, contributorHandle, contributorDescription, "kakadkl");
+            contributorLine.bind(contributorTitle, contributorHandle, contributorDescription, "tttmochka");
         }
 
         private final class ProfileLine extends FrameLayout {

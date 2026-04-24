@@ -43,6 +43,26 @@ public class MassgramAudioProcessorTest {
     }
 
     @Test
+    public void activeProcessorReadsConsumedRecordingBufferFromStart() {
+        MassgramAudioProcessor processor = new MassgramAudioProcessor();
+        assertTrue(processor.configure(48000, 1, 1.4f));
+
+        int inputSamples = 640 * 20;
+        ByteBuffer input = createSineBuffer(inputSamples);
+        while (input.hasRemaining()) {
+            input.getShort();
+        }
+
+        processor.queueInput(input, inputSamples * 2);
+        processor.queueEndOfStream();
+
+        short[] outputSamples = collectAllSamples(processor);
+
+        assertTrue("outputSamples.length=" + outputSamples.length, outputSamples.length > 0);
+        assertTrue("outputSamples.length=" + outputSamples.length, Math.abs(outputSamples.length - inputSamples) <= 320);
+    }
+
+    @Test
     public void streamingChunksDoNotCreateBoundarySeams() {
         short[] wholeSamples = processSignal(1.4f, 640 * 20, 640 * 20);
         short[] chunkedSamples = processSignal(1.4f, 640 * 20, 640);

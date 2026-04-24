@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.6.3",
-    "versionCode":  665739,
+    "versionName":  "12.6.4",
+    "versionCode":  665749,
     "apkUrl":  "https://github.com/oxura/massgram/releases/latest/download/massgram.apk",
-    "sha256":  "42b6eb6afb065ddacfb0b8f1e9c4001edc2e09396360e5a2c8b075608d98f0aa",
-    "apkSize":  133050971,
-    "changelog":  "Unified chat lock color and stronger locked preview blur."
+    "sha256":  "374e533193b9f877d9931c8fad778a661e440bb4f1c2f3616d0068e8b1bafb42",
+    "apkSize":  133051128,
+    "changelog":  "Massgram 12.6.4\n\n- Fixed voice messages recorded with voice pitch enabled so the audio track is no longer empty.\n- Changed locked chat badges to gray.\n- Improved external share handling to avoid duplicate share screens and freezes.\n- Updated Massgram settings testing and development credit."
 }
 

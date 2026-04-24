@@ -1,5 +1,11 @@
 ﻿[
     {
+        "versionName":  "12.6.4",
+        "versionCode":  665749,
+        "publishedAt":  "2026-04-24T17:28:54Z",
+        "changelog":  "Massgram 12.6.4\n\n- Fixed voice messages recorded with voice pitch enabled so the audio track is no longer empty.\n- Changed locked chat badges to gray.\n- Improved external share handling to avoid duplicate share screens and freezes.\n- Updated Massgram settings testing and development credit."
+    },
+    {
         "versionName":  "12.6.3",
         "versionCode":  665739,
         "publishedAt":  "2026-04-14T04:53:31Z",
