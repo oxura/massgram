@@ -1,5 +1,5 @@
-import { corsHeaders } from "./_shared/cors.ts";
-import { supabaseAdmin } from "./_shared/supabase-admin.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { supabaseAdmin } from "../_shared/supabase-admin.ts";
 
 type HeartbeatPayload = {
   user_id?: number;

@@ -371,7 +371,45 @@ public class FileLog {
         return "";
     }
 
+    private static void captureMassgramHandledError(Throwable e) {
+        if (e == null || !needSent(e) || hasMassgramTelemetryFrame(e)) {
+            return;
+        }
+        try {
+            MassgramTelemetryManager.getInstance().captureHandledError("filelog_error", null, 0L, e, null);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static void captureMassgramFatal(Throwable e) {
+        if (e == null || hasMassgramTelemetryFrame(e)) {
+            return;
+        }
+        try {
+            MassgramTelemetryManager.getInstance().captureFatal("filelog_fatal", 0L, e);
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static boolean hasMassgramTelemetryFrame(Throwable e) {
+        Throwable current = e;
+        while (current != null) {
+            StackTraceElement[] stackTrace = current.getStackTrace();
+            if (stackTrace != null) {
+                for (int i = 0; i < stackTrace.length; i++) {
+                    StackTraceElement frame = stackTrace[i];
+                    if (frame != null && "org.telegram.messenger.MassgramTelemetryManager".equals(frame.getClassName())) {
+                        return true;
+                    }
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     public static void e(final String message, final Throwable exception) {
+        captureMassgramHandledError(exception);
         if (!BuildVars.LOGS_ENABLED) {
             return;
         }
@@ -417,6 +455,7 @@ public class FileLog {
     }
 
     public static void e(final Throwable e, boolean logToAppCenter) {
+        captureMassgramHandledError(e);
         if (!BuildVars.LOGS_ENABLED) {
             return;
         }
@@ -501,6 +540,7 @@ public class FileLog {
     }
 
     public static void fatal(final Throwable e, boolean logToAppCenter) {
+        captureMassgramFatal(e);
         if (!BuildVars.LOGS_ENABLED) {
             return;
         }

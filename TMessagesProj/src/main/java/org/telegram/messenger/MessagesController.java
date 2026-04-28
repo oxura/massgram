@@ -20703,23 +20703,23 @@ public class MessagesController extends BaseController implements NotificationCe
             topicsController.markAllReactionsAsRead(-dialogId, topicId);
         }
         getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, 0);
-        if (!GhostModeManager.getInstance().shouldBlockReadReceipts()) {
-            TLRPC.TL_messages_readReactions req = new TLRPC.TL_messages_readReactions();
-            req.peer = getInputPeer(dialogId);
+        // This clears only the local reaction notification on Telegram servers. If Ghost Mode blocks it,
+        // stale reaction badges are restored on the next dialog sync.
+        TLRPC.TL_messages_readReactions req = new TLRPC.TL_messages_readReactions();
+        req.peer = getInputPeer(dialogId);
 
-            if (topicId != 0) {
-                if (isMonoForum(dialogId)) {
-                    req.saved_peer_id = getInputPeer(topicId);
-                    req.flags |= 2;
-                } else {
-                    req.top_msg_id = (int) topicId;
-                    req.flags |= 1;
-                }
+        if (topicId != 0) {
+            if (isMonoForum(dialogId)) {
+                req.saved_peer_id = getInputPeer(topicId);
+                req.flags |= 2;
+            } else {
+                req.top_msg_id = (int) topicId;
+                req.flags |= 1;
             }
-            getConnectionsManager().sendRequest(req, (response, error) -> {
-
-            });
         }
+        getConnectionsManager().sendRequest(req, (response, error) -> {
+
+        });
         NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, UPDATE_MASK_REACTIONS_READ);
     }
 

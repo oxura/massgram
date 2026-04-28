@@ -1,5 +1,11 @@
 ﻿[
     {
+        "versionName":  "12.6.5",
+        "versionCode":  665759,
+        "publishedAt":  "2026-04-28T05:16:18Z",
+        "changelog":  "Massgram update: added @kakadkl to testers, fixed reaction badges and telemetry crash reporting."
+    },
+    {
         "versionName":  "12.6.4",
         "versionCode":  665749,
         "publishedAt":  "2026-04-24T17:28:54Z",

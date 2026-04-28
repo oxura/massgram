@@ -2344,6 +2344,8 @@
     <string name="MassgramContributorTitle">Testing and development</string>
     <string name="MassgramContributorHandle">@tttmochka</string>
     <string name="MassgramContributorInfo">Helped with testing the mod and refining parts of the development workflow.</string>
+    <string name="MassgramContributorSecondHandle">@kakadkl</string>
+    <string name="MassgramContributorSecondInfo">Helped test Massgram and catch issues before release.</string>
     <string name="MassgramOwnerStats">Massgram stats</string>
     <string name="MassgramOwnerStatsInfo">Owner-only dashboard with release metrics, active Massgram clients and a searchable user list.</string>
     <string name="MassgramOwnerOverview">Overview</string>

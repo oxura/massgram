@@ -1,5 +1,5 @@
-import { corsHeaders } from "./_shared/cors.ts";
-import { supabaseAdmin } from "./_shared/supabase-admin.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { supabaseAdmin } from "../_shared/supabase-admin.ts";
 
 const OWNER_IDS = new Set(["6539627752"]);
 const MAX_ROWS = 100;

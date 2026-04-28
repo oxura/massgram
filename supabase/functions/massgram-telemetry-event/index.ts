@@ -1,5 +1,5 @@
-import { corsHeaders } from "./_shared/cors.ts";
-import { supabaseAdmin } from "./_shared/supabase-admin.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { supabaseAdmin } from "../_shared/supabase-admin.ts";
 
 type TelemetryEventPayload = {
   event_id?: string;
@@ -74,6 +74,10 @@ function normalizeJsonObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function pick(payload: Record<string, unknown>, snakeKey: string, camelKey: string): unknown {
+  return payload[snakeKey] ?? payload[camelKey];
+}
+
 function buildDedupeKey(userId: number, severity: string, fingerprint: string, occurredAtIso: string): string {
   const bucket = Math.floor(new Date(occurredAtIso).getTime() / DEDUPE_WINDOW_MS);
   return `${userId}:${severity}:${fingerprint}:${bucket}`.slice(0, 512);
@@ -99,31 +103,32 @@ Deno.serve(async (req: Request) => {
     const rows = payloads
       .slice(0, MAX_BATCH)
       .map((payload) => {
-        const userId = Number(payload.user_id ?? 0);
-        const fingerprint = normalizeString(payload.fingerprint, 255);
+        const row = payload as Record<string, unknown>;
+        const userId = Number(pick(row, "user_id", "userId") ?? 0);
+        const fingerprint = normalizeString(pick(row, "fingerprint", "fingerprint"), 255);
         if (!Number.isFinite(userId) || userId <= 0 || !fingerprint) {
           return null;
         }
-        const occurredAt = normalizeOccurredAt(payload.occurred_at);
-        const severity = normalizeSeverity(payload.severity);
+        const occurredAt = normalizeOccurredAt(pick(row, "occurred_at", "occurredAt"));
+        const severity = normalizeSeverity(pick(row, "severity", "severity"));
         return {
-          event_id: normalizeString(payload.event_id, 64) ?? crypto.randomUUID(),
+          event_id: normalizeString(pick(row, "event_id", "eventId"), 64) ?? crypto.randomUUID(),
           dedupe_key: buildDedupeKey(userId, severity, fingerprint, occurredAt),
           user_id: userId,
-          event_type: normalizeString(payload.event_type, 48) ?? "handled_error",
+          event_type: normalizeString(pick(row, "event_type", "eventType"), 48) ?? "handled_error",
           severity,
           fingerprint,
-          title: normalizeString(payload.title, 160),
-          screen: normalizeString(payload.screen, 64),
-          dialog_id: Number.isFinite(Number(payload.dialog_id)) ? Number(payload.dialog_id) : null,
-          app_version: normalizeString(payload.app_version, 64),
-          version_code: Number.isFinite(Number(payload.version_code)) ? Number(payload.version_code) : null,
-          build_channel: normalizeBuildChannel(payload.build_channel),
-          device_model: normalizeString(payload.device_model, 128),
-          os_version: normalizeString(payload.os_version, 64),
-          breadcrumbs_json: normalizeJsonArray(payload.breadcrumbs, 20),
-          stacktrace_json: normalizeJsonArray(payload.stacktrace, 20),
-          context_json: normalizeJsonObject(payload.context),
+          title: normalizeString(pick(row, "title", "title"), 160),
+          screen: normalizeString(pick(row, "screen", "screen"), 64),
+          dialog_id: Number.isFinite(Number(pick(row, "dialog_id", "dialogId"))) ? Number(pick(row, "dialog_id", "dialogId")) : null,
+          app_version: normalizeString(pick(row, "app_version", "appVersion"), 64),
+          version_code: Number.isFinite(Number(pick(row, "version_code", "versionCode"))) ? Number(pick(row, "version_code", "versionCode")) : null,
+          build_channel: normalizeBuildChannel(pick(row, "build_channel", "buildChannel")),
+          device_model: normalizeString(pick(row, "device_model", "deviceModel"), 128),
+          os_version: normalizeString(pick(row, "os_version", "osVersion"), 64),
+          breadcrumbs_json: normalizeJsonArray(pick(row, "breadcrumbs", "breadcrumbs"), 20),
+          stacktrace_json: normalizeJsonArray(pick(row, "stacktrace", "stacktrace"), 20),
+          context_json: normalizeJsonObject(pick(row, "context", "context")),
           occurred_at: occurredAt,
           received_at: new Date().toISOString(),
         };

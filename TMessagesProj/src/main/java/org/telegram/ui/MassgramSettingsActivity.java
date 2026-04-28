@@ -365,7 +365,9 @@ public class MassgramSettingsActivity extends UniversalFragment {
                 LocaleController.getString(R.string.MassgramDeveloperInfo),
                 LocaleController.getString(R.string.MassgramContributorTitle),
                 LocaleController.getString(R.string.MassgramContributorHandle),
-                LocaleController.getString(R.string.MassgramContributorInfo)
+                LocaleController.getString(R.string.MassgramContributorInfo),
+                LocaleController.getString(R.string.MassgramContributorSecondHandle),
+                LocaleController.getString(R.string.MassgramContributorSecondInfo)
             );
         }
     }
@@ -999,6 +1001,7 @@ public class MassgramSettingsActivity extends UniversalFragment {
 
         private final ProfileLine developerLine;
         private final ProfileLine contributorLine;
+        private final ProfileLine contributorSecondLine;
 
         private MassgramDeveloperCard(Context context) {
             super(context);
@@ -1018,12 +1021,20 @@ public class MassgramSettingsActivity extends UniversalFragment {
             contributorLine = new ProfileLine(context, R.drawable.msg_message, false);
             container.addView(contributorLine, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
+            View contributorDivider = new View(context);
+            contributorDivider.setBackgroundColor(ColorUtils.setAlphaComponent(getThemedColor(Theme.key_divider), 140));
+            container.addView(contributorDivider, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 48, 12, 0, 12));
+
+            contributorSecondLine = new ProfileLine(context, R.drawable.msg_message, false);
+            container.addView(contributorSecondLine, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
             setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(20), Color.TRANSPARENT, ColorUtils.setAlphaComponent(getThemedColor(Theme.key_listSelector), 32)));
         }
 
-        private void bind(CharSequence developerTitle, CharSequence developerHandle, CharSequence developerDescription, CharSequence contributorTitle, CharSequence contributorHandle, CharSequence contributorDescription) {
+        private void bind(CharSequence developerTitle, CharSequence developerHandle, CharSequence developerDescription, CharSequence contributorTitle, CharSequence contributorHandle, CharSequence contributorDescription, CharSequence contributorSecondHandle, CharSequence contributorSecondDescription) {
             developerLine.bind(developerTitle, developerHandle, developerDescription, "awenqo");
             contributorLine.bind(contributorTitle, contributorHandle, contributorDescription, "tttmochka");
+            contributorSecondLine.bind(contributorTitle, contributorSecondHandle, contributorSecondDescription, "kakadkl");
         }
 
         private final class ProfileLine extends FrameLayout {

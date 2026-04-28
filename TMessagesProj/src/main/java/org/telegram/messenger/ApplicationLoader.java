@@ -288,8 +288,8 @@ public class ApplicationLoader extends Application {
         } catch (Throwable ignore) {
 
         }
-
         super.onCreate();
+        BuildVars.loadSystemConfig();
 
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("app start time = " + (startTime = SystemClock.elapsedRealtime()));

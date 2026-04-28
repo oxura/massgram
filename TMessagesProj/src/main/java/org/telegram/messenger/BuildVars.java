@@ -42,11 +42,28 @@ public class BuildVars {
 
     // works only on official app ids, disable on your forks
     public static boolean SUPPORTS_PASSKEYS = false;
+    private static volatile boolean massgramFatalHandlerInstalled;
 
     static {
+        loadSystemConfig();
+    }
+
+    public static void loadSystemConfig() {
         if (ApplicationLoader.applicationContext != null) {
             SharedPreferences sharedPreferences = ApplicationLoader.applicationContext.getSharedPreferences("systemConfig", Context.MODE_PRIVATE);
             LOGS_ENABLED = DEBUG_VERSION || sharedPreferences.getBoolean("logsEnabled", DEBUG_VERSION);
+            installMassgramFatalHandler();
+        }
+    }
+
+    private static void installMassgramFatalHandler() {
+        if (massgramFatalHandlerInstalled || ApplicationLoader.applicationContext == null) {
+            return;
+        }
+        synchronized (BuildVars.class) {
+            if (massgramFatalHandlerInstalled || ApplicationLoader.applicationContext == null) {
+                return;
+            }
             final Thread.UncaughtExceptionHandler pastHandler = Thread.getDefaultUncaughtExceptionHandler();
             Thread.setDefaultUncaughtExceptionHandler((thread, exception) -> {
                 try {
@@ -60,6 +77,7 @@ public class BuildVars {
                     pastHandler.uncaughtException(thread, exception);
                 }
             });
+            massgramFatalHandlerInstalled = true;
         }
     }
 

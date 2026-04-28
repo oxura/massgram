@@ -319,6 +319,8 @@
     <string name="MassgramContributorTitle">Тестирование и разработка</string>
     <string name="MassgramContributorHandle">@tttmochka</string>
     <string name="MassgramContributorInfo">Тестировала мод и помогала с доработкой части процесса разработки.</string>
+    <string name="MassgramContributorSecondHandle">@kakadkl</string>
+    <string name="MassgramContributorSecondInfo">Тестировал Massgram и помогал находить проблемы перед релизом.</string>
     <string name="MassgramOwnerStats">Статистика Massgram</string>
     <string name="MassgramOwnerStatsInfo">Экран только для владельца с метриками релизов, активных клиентов Massgram и поиском по пользователям.</string>
     <string name="MassgramOwnerOverview">Обзор</string>

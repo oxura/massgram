@@ -637,7 +637,7 @@ public class MassgramTelemetryManager {
             return;
         }
         JSONObject requestBody = new JSONObject();
-        requestBody.put("events", new JSONArray(MassgramTelemetryFormat.serializeQueue(batch)));
+        requestBody.put("events", new JSONArray(MassgramTelemetryFormat.serializeUploadBatch(batch)));
         HttpURLConnection connection = null;
         BufferedOutputStream outputStream = null;
         BufferedInputStream inputStream = null;

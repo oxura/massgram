@@ -161,6 +161,39 @@ final class MassgramTelemetryFormat {
         return GSON.toJson(events != null ? events : new ArrayList<TelemetryEvent>());
     }
 
+    static String serializeUploadBatch(List<TelemetryEvent> events) {
+        ArrayList<LinkedHashMap<String, Object>> rows = new ArrayList<>();
+        if (events == null || events.isEmpty()) {
+            return GSON.toJson(rows);
+        }
+        for (int i = 0; i < events.size(); i++) {
+            TelemetryEvent event = events.get(i);
+            if (event == null) {
+                continue;
+            }
+            LinkedHashMap<String, Object> row = new LinkedHashMap<>();
+            row.put("event_id", event.eventId);
+            row.put("user_id", event.userId);
+            row.put("event_type", event.eventType);
+            row.put("severity", event.severity);
+            row.put("fingerprint", event.fingerprint);
+            row.put("title", event.title);
+            row.put("screen", event.screen);
+            row.put("dialog_id", event.dialogId);
+            row.put("app_version", event.appVersion);
+            row.put("version_code", event.versionCode);
+            row.put("build_channel", event.buildChannel);
+            row.put("device_model", event.deviceModel);
+            row.put("os_version", event.osVersion);
+            row.put("breadcrumbs", event.breadcrumbs != null ? event.breadcrumbs : new ArrayList<>());
+            row.put("stacktrace", event.stacktrace != null ? event.stacktrace : new ArrayList<>());
+            row.put("context", event.context != null ? event.context : new LinkedHashMap<>());
+            row.put("occurred_at", event.occurredAt);
+            rows.add(row);
+        }
+        return GSON.toJson(rows);
+    }
+
     static ArrayList<TelemetryEvent> deserializeQueue(String serialized) {
         ArrayList<TelemetryEvent> events = new ArrayList<>();
         if (serialized == null || serialized.trim().isEmpty()) {

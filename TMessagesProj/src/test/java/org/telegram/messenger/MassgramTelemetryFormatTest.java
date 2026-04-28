@@ -120,6 +120,43 @@ public class MassgramTelemetryFormatTest {
     }
 
     @Test
+    public void uploadBatchUsesBackendSnakeCaseFields() {
+        MassgramTelemetryFormat.TelemetryEvent original = new MassgramTelemetryFormat.TelemetryEvent();
+        original.eventId = "evt-1";
+        original.userId = 42L;
+        original.eventType = "fatal";
+        original.severity = "fatal";
+        original.fingerprint = "fatal|chat|IllegalStateException|ChatActivity#scroll";
+        original.title = "IllegalStateException: bad state";
+        original.screen = "chat";
+        original.dialogId = 99L;
+        original.appVersion = "12.6.4";
+        original.versionCode = 12640L;
+        original.buildChannel = "stable";
+        original.deviceModel = "Pixel";
+        original.osVersion = "Android 15";
+        original.occurredAt = 123L;
+        original.breadcrumbs = new ArrayList<>();
+        original.stacktrace = new ArrayList<>();
+        original.context = MassgramTelemetryFormat.mapOf("dialog_id", 99L);
+
+        ArrayList<MassgramTelemetryFormat.TelemetryEvent> events = new ArrayList<>();
+        events.add(original);
+
+        String batch = MassgramTelemetryFormat.serializeUploadBatch(events);
+
+        assertTrue(batch.startsWith("["));
+        assertTrue(batch.contains("\"user_id\":42"));
+        assertTrue(batch.contains("\"event_type\":\"fatal\""));
+        assertTrue(batch.contains("\"dialog_id\":99"));
+        assertTrue(batch.contains("\"version_code\":12640"));
+        assertFalse(batch.contains("userId"));
+        assertFalse(batch.contains("eventType"));
+        assertFalse(batch.contains("dialogId"));
+        assertFalse(batch.contains("versionCode"));
+    }
+
+    @Test
     public void duplicateFingerprintIsThrottledWithinCooldown() {
         java.util.HashMap<String, Long> lastSent = new java.util.HashMap<>();
         String fingerprint = "fatal|chat|IllegalStateException|ChatActivity#scroll";
