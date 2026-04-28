@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.6.5",
-    "versionCode":  665759,
+    "versionName":  "12.6.6",
+    "versionCode":  665769,
     "apkUrl":  "https://github.com/oxura/massgram/releases/latest/download/massgram.apk",
-    "sha256":  "65d02d272b6c60fbda511dc4662f44b5c88389114b768b2d08ba9edec0625d64",
-    "apkSize":  133052496,
-    "changelog":  "Massgram update: added @kakadkl to testers, fixed reaction badges and telemetry crash reporting."
+    "sha256":  "249431146a1f87e7e60a07e086181ff5ada1d4310d315641991f9ade064ac25a",
+    "apkSize":  133052228,
+    "changelog":  "Massgram update: fixed stale unread reaction badges in chats."
 }
 

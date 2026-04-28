@@ -9938,6 +9938,7 @@ public class ChatActivity extends BaseFragment implements
             updateReactionsMentionButton(false);
             updatePollVotesMentionButton(false);
             updateTopicButtons();
+            markCurrentDialogReactionMentionsRead(false);
             if (searchItemListener != null && actionBar.isSearchFieldVisible()) {
                 searchItemListener.onSearchPressed(null);
             }
@@ -10039,6 +10040,7 @@ public class ChatActivity extends BaseFragment implements
             updateReactionsMentionButton(false);
             updatePollVotesMentionButton(false);
             updateTopicButtons();
+            markCurrentDialogReactionMentionsRead(false);
             if (searchItemListener != null && actionBar.isSearchFieldVisible()) {
                 searchItemListener.onSearchPressed(null);
             }
@@ -10813,6 +10815,23 @@ public class ChatActivity extends BaseFragment implements
         boolean visible = reactionsMentionCount > 0 && (chatMode == 0 || chatMode == MODE_SUGGESTIONS);
         sideControlsButtonsLayout.showButton(ChatActivitySideControlsButtonsLayout.BUTTON_REACTIONS, visible, animated);
         sideControlsButtonsLayout.setButtonCount(ChatActivitySideControlsButtonsLayout.BUTTON_REACTIONS, reactionsMentionCount, animated);
+    }
+
+    private void markCurrentDialogReactionMentionsRead(boolean animated) {
+        if (reactionsMentionCount <= 0 || chatMode != 0 && chatMode != MODE_SUGGESTIONS) {
+            return;
+        }
+        // Server-side unread reaction counters can include old entries until readReactions is sent.
+        // Clear them when the user is actually in this dialog so stale reactions do not reappear later.
+        for (int i = 0; i < messages.size(); i++) {
+            MessageObject messageObject = messages.get(i);
+            if (messageObject != null) {
+                messageObject.markReactionsAsRead();
+            }
+        }
+        reactionsMentionCount = 0;
+        updateReactionsMentionButton(animated);
+        getMessagesController().markReactionsAsRead(dialog_id, getTopicId());
     }
 
     private void updatePollVotesMentionButton(boolean animated) {
@@ -23915,7 +23934,9 @@ public class ChatActivity extends BaseFragment implements
                         }
                     }
                 }
-                if (reactionsMentionCount <= 0) {
+                if (fragmentOpened && openAnimationEnded && reactionsMentionCount > 0) {
+                    markCurrentDialogReactionMentionsRead(true);
+                } else if (reactionsMentionCount <= 0) {
                     reactionsMentionCount = 0;
                     getMessagesController().markReactionsAsRead(dialogId, getTopicId());
                 }
@@ -26870,6 +26891,7 @@ public class ChatActivity extends BaseFragment implements
                 pendingRequestsDelegate.onBackToScreen();
             }
             updateMessagesVisiblePart(false);
+            markCurrentDialogReactionMentionsRead(true);
         } else {
             getNotificationCenter().onAnimationFinish(transitionAnimationIndex);
             NotificationCenter.getGlobalInstance().onAnimationFinish(transitionAnimationGlobalIndex);
@@ -29293,6 +29315,9 @@ public class ChatActivity extends BaseFragment implements
 
         if (chatMode == 0) {
             getNotificationsController().setOpenedDialogId(dialog_id, getTopicId());
+            if (openAnimationEnded) {
+                markCurrentDialogReactionMentionsRead(false);
+            }
         }
         getMessagesController().setLastVisibleDialogId(dialog_id, chatMode == MODE_SCHEDULED, true);
         if (scrollToTopOnResume) {

@@ -1,5 +1,11 @@
 ﻿[
     {
+        "versionName":  "12.6.6",
+        "versionCode":  665769,
+        "publishedAt":  "2026-04-28T16:39:18Z",
+        "changelog":  "Massgram update: fixed stale unread reaction badges in chats."
+    },
+    {
         "versionName":  "12.6.5",
         "versionCode":  665759,
         "publishedAt":  "2026-04-28T05:16:18Z",
