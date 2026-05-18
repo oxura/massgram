@@ -83,6 +83,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -266,6 +268,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 
 import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
@@ -9051,8 +9054,19 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         );
     }
 
+    private void finishChatUnlock(long dialogId, boolean keepSelectionMode, Runnable onUnlocked) {
+        MassgramChatLockManager.getInstance().markDialogUnlocked(dialogId);
+        if (!keepSelectionMode && actionBar.isActionModeShowed()) {
+            hideActionMode(true);
+        }
+        if (onUnlocked != null) {
+            AndroidUtilities.runOnUIThread(onUnlocked);
+        }
+    }
+
     private void showUnlockChatDialog(long dialogId, boolean keepSelectionMode, Runnable onUnlocked) {
         String hint = MassgramChatLockManager.getInstance().getHint(dialogId);
+        boolean canUseBiometrics = canUseMassgramChatBiometrics();
         showPinInputDialog(
             LocaleController.getString(R.string.MassgramUnlockChat),
             LocaleController.getString(R.string.MassgramUnlockChatInfo),
@@ -9064,18 +9078,64 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     showDialog(AlertsCreator.createSimpleAlert(getParentActivity(), LocaleController.getString(R.string.MassgramInvalidChatPinTitle), LocaleController.getString(R.string.MassgramInvalidChatPinText)).create());
                     return false;
                 }
-                chatLockManager.markDialogUnlocked(dialogId);
-                if (!keepSelectionMode && actionBar.isActionModeShowed()) {
-                    hideActionMode(true);
-                }
-                if (onUnlocked != null) {
-                    AndroidUtilities.runOnUIThread(onUnlocked);
-                }
+                finishChatUnlock(dialogId, keepSelectionMode, onUnlocked);
                 return true;
             },
             TextUtils.isEmpty(hint) ? null : LocaleController.getString(R.string.MassgramChatPinShowHint),
-            TextUtils.isEmpty(hint) ? null : () -> showDialog(AlertsCreator.createSimpleAlert(getParentActivity(), LocaleController.getString(R.string.MassgramChatPinSavedHintTitle), LocaleController.formatString(R.string.MassgramChatPinHintValue, hint)).create())
+            TextUtils.isEmpty(hint) ? null : () -> showDialog(AlertsCreator.createSimpleAlert(getParentActivity(), LocaleController.getString(R.string.MassgramChatPinSavedHintTitle), LocaleController.formatString(R.string.MassgramChatPinHintValue, hint)).create()),
+            canUseBiometrics ? LocaleController.getString(R.string.UnlockFingerprint) : null,
+            canUseBiometrics ? dialog -> showMassgramChatBiometricPrompt(dialog, dialogId, keepSelectionMode, onUnlocked) : null
         );
+    }
+
+    private boolean canUseMassgramChatBiometrics() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || getParentActivity() == null || LaunchActivity.instance == null) {
+            return false;
+        }
+        try {
+            return BiometricManager.from(getParentActivity()).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS;
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+        return false;
+    }
+
+    private void showMassgramChatBiometricPrompt(AlertDialog sourceDialog, long dialogId, boolean keepSelectionMode, Runnable onUnlocked) {
+        if (!canUseMassgramChatBiometrics()) {
+            return;
+        }
+        Executor executor = ContextCompat.getMainExecutor(getParentActivity());
+        BiometricPrompt prompt = new BiometricPrompt(LaunchActivity.instance, executor, new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                FileLog.d("MassgramChatLock onAuthenticationError " + errorCode + " \"" + errString + "\"");
+            }
+
+            @Override
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                FileLog.d("MassgramChatLock onAuthenticationSucceeded");
+                if (sourceDialog != null) {
+                    sourceDialog.dismiss();
+                }
+                finishChatUnlock(dialogId, keepSelectionMode, onUnlocked);
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                FileLog.d("MassgramChatLock onAuthenticationFailed");
+            }
+        });
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+            .setTitle(LocaleController.getString(R.string.MassgramUnlockChat))
+            .setDescription(LocaleController.getString(R.string.MassgramUnlockChatInfo))
+            .setNegativeButtonText(LocaleController.getString(R.string.UsePIN))
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .build();
+        prompt.authenticate(promptInfo);
+    }
+
+    private interface MassgramDialogAction {
+        void run(AlertDialog dialog);
     }
 
     private void showPinInputDialog(String title, String message, String fieldHint, String positiveText, Utilities.CallbackReturn<String, Boolean> onSubmit) {
@@ -9083,6 +9143,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void showPinInputDialog(String title, String message, String fieldHint, String positiveText, Utilities.CallbackReturn<String, Boolean> onSubmit, String secondaryText, Runnable onSecondaryAction) {
+        showPinInputDialog(title, message, fieldHint, positiveText, onSubmit, secondaryText, onSecondaryAction, null, null);
+    }
+
+    private void showPinInputDialog(String title, String message, String fieldHint, String positiveText, Utilities.CallbackReturn<String, Boolean> onSubmit, String secondaryText, Runnable onSecondaryAction, String biometricText, MassgramDialogAction onBiometricAction) {
         if (getParentActivity() == null) {
             return;
         }
@@ -9100,10 +9164,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             container.addView(messageView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         }
 
+        final Runnable[] submitAction = new Runnable[1];
         CodeFieldContainer codeFieldContainer = new CodeFieldContainer(getParentActivity()) {
             @Override
             protected void processNextPressed() {
                 super.processNextPressed();
+                if (submitAction[0] != null) {
+                    submitAction[0].run();
+                }
             }
         };
         codeFieldContainer.setNumbersCount(4, CodeFieldContainer.TYPE_PASSCODE);
@@ -9126,7 +9194,20 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         errorView.setGravity(Gravity.CENTER_HORIZONTAL);
         errorView.setVisibility(View.GONE);
         container.addView(errorView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
+        TextView biometricView = null;
+        if (!TextUtils.isEmpty(biometricText) && onBiometricAction != null) {
+            biometricView = new TextView(getParentActivity());
+            biometricView.setText(biometricText);
+            biometricView.setTextColor(getThemedColor(Theme.key_dialogTextBlue2));
+            biometricView.setTextSize(15);
+            biometricView.setGravity(Gravity.CENTER);
+            biometricView.setCompoundDrawablesWithIntrinsicBounds(R.drawable.fingerprint, 0, 0, 0);
+            biometricView.setCompoundDrawablePadding(dp(8));
+            biometricView.setPadding(0, dp(10), 0, dp(2));
+            container.addView(biometricView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 12, 0, 0));
+        }
         final TextView hintViewFinal = hintView;
+        final TextView biometricViewFinal = biometricView;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
         builder.setTitle(title);
@@ -9156,7 +9237,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     neutralButton.setOnClickListener(v -> onSecondaryAction.run());
                 }
             }
-            positiveButton.setOnClickListener(v -> {
+            submitAction[0] = () -> {
                 String pin = codeFieldContainer.getCode().trim();
                 errorView.setVisibility(View.GONE);
                 if (hintViewFinal != null) {
@@ -9173,7 +9254,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 if (Boolean.TRUE.equals(onSubmit.run(pin))) {
                     dialog.dismiss();
                 }
-            });
+            };
+            positiveButton.setOnClickListener(v -> submitAction[0].run());
+            if (biometricViewFinal != null) {
+                biometricViewFinal.setOnClickListener(v -> onBiometricAction.run(dialog));
+            }
         });
         showDialog(dialog);
     }

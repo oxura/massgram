@@ -1,9 +1,9 @@
 ﻿{
-    "versionName":  "12.6.3-beta2",
-    "versionCode":  665729,
+    "versionName":  "12.6.7-beta1",
+    "versionCode":  665779,
     "apkUrl":  "https://github.com/oxura/massgram/releases/download/beta/massgram-beta.apk",
-    "sha256":  "375ece98cd69c980cf3508e6d7b3ce6f5a0be5e5ba4e023ad60c4ffd7fb34bfb",
-    "apkSize":  137907841,
-    "changelog":  "Massgram beta 12.6.3-beta2\n\n- Fixed premium custom emoji reactions on messages for Massgram users\n- Added Massgram sidecar fallback when Telegram rejects premium custom reactions for non-Premium Telegram accounts\n- Synced reaction state across Massgram clients and hid reaction transport messages from chat and notifications\n- Kept custom emoji reaction picker and premium gating aligned with Massgram premium access"
+    "sha256":  "23df8824132b69228423b0b70d5a56b91bc9d028e5a0b747d493222c60f64d28",
+    "apkSize":  133054718,
+    "changelog":  "Massgram beta 12.6.7-beta1\n\n- Fixed bot reply buttons getting corrupted by Massgram hidden transport markers.\n- Added biometric unlock for locked chats when the device supports strong biometrics.\n- Locked chats now open immediately after entering the correct 4-digit PIN, without pressing the unlock button."
 }
 

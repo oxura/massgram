@@ -12,6 +12,8 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.telegram.tgnet.TLRPC;
+
 public class MassgramCryptoManager {
 
     private static final String KEY_ENABLED_PREFIX = "massgram_crypto_enabled_";
@@ -44,6 +46,14 @@ public class MassgramCryptoManager {
 
     public boolean supportsDialog(long dialogId) {
         return DialogObject.isUserDialog(dialogId);
+    }
+
+    public boolean supportsUserPeer(TLRPC.User user) {
+        return user != null && supportsUserPeer(user.id, user.bot, UserObject.isUserSelf(user));
+    }
+
+    static boolean supportsUserPeer(long dialogId, boolean bot, boolean self) {
+        return DialogObject.isUserDialog(dialogId) && !bot && !self;
     }
 
     public boolean isEncryptionEnabled(long dialogId) {

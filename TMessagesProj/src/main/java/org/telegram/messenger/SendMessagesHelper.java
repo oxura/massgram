@@ -3361,6 +3361,23 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             && getMassgramPremiumTextEntities(entities) != null;
     }
 
+    private TLRPC.User getMassgramUserPeer(long dialogId, TLRPC.User fallbackUser) {
+        if (!DialogObject.isUserDialog(dialogId)) {
+            return null;
+        }
+        if (fallbackUser != null && fallbackUser.id == dialogId) {
+            return fallbackUser;
+        }
+        TLRPC.User user = getMessagesController().getUser(dialogId);
+        if (user == null) {
+            user = getMessagesStorage().getUserSync(dialogId);
+            if (user != null) {
+                getMessagesController().putUser(user, true);
+            }
+        }
+        return user;
+    }
+
     private PreparedMassgramEditedText prepareMassgramEditedText(MessageObject messageObject, CharSequence editingMessage, ArrayList<TLRPC.MessageEntity> editingEntities, boolean searchLinks) {
         if (messageObject == null || editingMessage == null) {
             return null;
@@ -3369,10 +3386,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         ArrayList<TLRPC.MessageEntity> outgoingEntities = editingEntities;
         long dialogId = messageObject.getDialogId();
         MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
+        boolean supportsMassgramUserPeer = cryptoManager.supportsUserPeer(getMassgramUserPeer(dialogId, null));
+        boolean unsupportedUserPeer = DialogObject.isUserDialog(dialogId) && !supportsMassgramUserPeer;
         ArrayList<TLRPC.MessageEntity> premiumTextEntities = getMassgramPremiumTextEntities(outgoingEntities);
         boolean shouldEncodePremiumPayload = shouldEncodeEditedMassgramPremiumText(messageObject, outgoingMessage)
             || premiumTextEntities != null;
-        if (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(messageObject.messageOwner != null ? messageObject.messageOwner.message : null)) {
+        if (supportsMassgramUserPeer && (cryptoManager.isEncryptionEnabled(dialogId) || cryptoManager.looksLikeEncryptedPayload(messageObject.messageOwner != null ? messageObject.messageOwner.message : null))) {
             if (shouldEncodePremiumPayload) {
                 outgoingMessage = MassgramPremiumMessageCodec.encodeText(outgoingMessage, premiumTextEntities);
                 if (outgoingMessage == null) {
@@ -3387,14 +3406,14 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             }
             searchLinks = false;
             outgoingEntities = null;
-        } else if (shouldEncodePremiumPayload) {
+        } else if (!unsupportedUserPeer && shouldEncodePremiumPayload) {
             outgoingMessage = MassgramPremiumMessageCodec.encodeText(outgoingMessage, premiumTextEntities);
             if (outgoingMessage == null) {
                 return null;
             }
             searchLinks = false;
             outgoingEntities = null;
-        } else if (cryptoManager.supportsDialog(dialogId) && !TextUtils.isEmpty(outgoingMessage)) {
+        } else if (supportsMassgramUserPeer && !TextUtils.isEmpty(outgoingMessage)) {
             outgoingMessage = cryptoManager.appendCapabilityMarker(dialogId, outgoingMessage);
         }
         return new PreparedMassgramEditedText(outgoingMessage, outgoingEntities, searchLinks);
@@ -4392,7 +4411,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (retryMessageObject == null) {
             MassgramCryptoManager cryptoManager = MassgramCryptoManager.getInstance(currentAccount);
             ArrayList<TLRPC.MessageEntity> premiumTextEntities = getMassgramPremiumTextEntities(entities);
-            if (DialogObject.isUserDialog(peer)) {
+            if (cryptoManager.supportsUserPeer(getMassgramUserPeer(peer, user))) {
                 if (cryptoManager.isEncryptionEnabled(peer)) {
                     boolean encryptedAnyText = false;
                     if (!TextUtils.isEmpty(message)) {
@@ -4441,7 +4460,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                 } else if (!TextUtils.isEmpty(message)) {
                     message = cryptoManager.appendCapabilityMarker(peer, message);
                 }
-            } else if (!DialogObject.isEncryptedDialog(peer) && shouldSendMassgramPremiumText(sendMessageParams.forceMassgramPremiumTextPayload, retryMessageObject, message, entities)) {
+            } else if (!DialogObject.isUserDialog(peer) && !DialogObject.isEncryptedDialog(peer) && shouldSendMassgramPremiumText(sendMessageParams.forceMassgramPremiumTextPayload, retryMessageObject, message, entities)) {
                 String payloadMessage = MassgramPremiumMessageCodec.encodeText(message, premiumTextEntities);
                 if (payloadMessage == null) {
                     return;

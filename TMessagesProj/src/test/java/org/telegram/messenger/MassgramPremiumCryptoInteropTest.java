@@ -46,6 +46,26 @@ public class MassgramPremiumCryptoInteropTest {
         assertFalse(cryptoManager.containsCapabilityMarker(withMarker));
     }
 
+    @Test
+    public void massgramUserPeerTransportSkipsBots() {
+        assertFalse(MassgramCryptoManager.supportsUserPeer(123L, true, false));
+    }
+
+    @Test
+    public void massgramUserPeerTransportSkipsSelf() {
+        assertFalse(MassgramCryptoManager.supportsUserPeer(123L, false, true));
+    }
+
+    @Test
+    public void massgramUserPeerTransportSkipsChats() {
+        assertFalse(MassgramCryptoManager.supportsUserPeer(-123L, false, false));
+    }
+
+    @Test
+    public void massgramUserPeerTransportAllowsRegularUsers() {
+        assertTrue(MassgramCryptoManager.supportsUserPeer(123L, false, false));
+    }
+
     private static MassgramCryptoManager createCryptoManager() {
         try {
             Constructor<MassgramCryptoManager> constructor = MassgramCryptoManager.class.getDeclaredConstructor(int.class);
